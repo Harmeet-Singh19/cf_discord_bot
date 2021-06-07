@@ -3,7 +3,7 @@ const Discord=require("discord.js");
 const client=new Discord.Client()
 const {getRating, getUpcoming}=require('./api_calls/basic')
 const {UnixToDate}=require('./api_calls/util')
-const {execute}=require('./api_calls/song')
+const {execute,skip,destroy}=require('./api_calls/song')
 const {getInfo,getURLVideoID,getVideoID}=require('ytdl-core')
 const ytdl = require("ytdl-core");
 client.login(process.env.BOT_ID)
@@ -61,13 +61,15 @@ client.on("message",async(msg)=>{
     //for multiple servers, different song queues for them
     //console.log(ServerQueue,msg.guild.id)
     if(msg.content.startsWith('$play')){
-        let final= await execute(msg,ServerQueue,queue);
+        let msgg="";
+        await execute(msg,ServerQueue,queue);
+        //msg.channel.send(msgg);
         return;
     } else if (msg.content.startsWith(`$skip`)) {
-        await skip(msg, serverQueue);
+        await skip(msg,ServerQueue,queue);
         return;
-      } else if (msg.content.startsWith(`$stop`)) {
-        await stop(msg, serverQueue);
+      } else if (msg.content.startsWith(`$destroy`)) {
+        await destroy(msg,ServerQueue,queue);
         return;
       }
 })
