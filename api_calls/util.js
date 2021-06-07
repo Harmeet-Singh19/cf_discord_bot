@@ -16,6 +16,38 @@ const UnixToDate=(UNIX_timestamp)=>{
     var time = date + ' ' + month + ' ' + year + ' ' + hour + ':' + min + ':' + sec ;
     return time;
 }
+
+const getLabels=(data)=>{
+  
+  console.log(arr,"LAbels")
+  return arr;
+}
+const getDatasets=(data)=>{
+  const dataGraph={};
+  let arr=[];
+  data.forEach((val)=>{
+    arr.push( val.rank)
+    //console.log(val.contestName + ":" + val.rank)
+  })
+  //console.log(arr,"labels")
+  dataGraph.labels=arr
+  let ratings=[];
+  data.forEach((val)=>{
+    ratings.push(val.newRating);
+  })
+  //console.log(ratings,"ratings")
+  var datasets=[];
+  datasets.push({label:'Rating changes',data:ratings,
+  borderColor:'#000080',
+
+})
+dataGraph.datasets=datasets;
+//console.log(dataGraph.datasets)
+return dataGraph
+}
+
 module.exports={
-    UnixToDate
+    UnixToDate,
+    getDatasets,
+    getLabels
 }

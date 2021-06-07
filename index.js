@@ -1,11 +1,12 @@
 require("dotenv").config();
 const Discord=require("discord.js");
 const client=new Discord.Client()
-const {getRating, getUpcoming}=require('./api_calls/basic')
-const {UnixToDate}=require('./api_calls/util')
-const {execute,skip,destroy}=require('./api_calls/song')
 const {getInfo,getURLVideoID,getVideoID}=require('ytdl-core')
 const ytdl = require("ytdl-core");
+const quickchart= require('quickchart-js')
+const {getRating, getUpcoming,getRatingGraph}=require('./api_calls/basic')
+const {UnixToDate}=require('./api_calls/util')
+const {execute,skip,destroy}=require('./api_calls/song')
 client.login(process.env.BOT_ID)
 
 client.on("ready",()=>{
@@ -25,8 +26,55 @@ const queue=new Map();
 client.on("message",(msg)=>{
     if (msg.author.bot) return;
     if (!msg.content.startsWith('$')) return;
-
-    if(msg.content.startsWith('$rating')){
+    if(msg.content.startsWith('$rGraph')){
+        let words=msg.content.split(',');
+        getRatingGraph(words[1]).then(async(val)=>{
+            let msgg="";
+            //console.log(val.datasets)
+            const chart= new quickchart();
+            chart.setConfig({
+                type:'line',
+                data:{
+                    labels:val.labels,
+                    datasets:val.datasets
+                },
+                options : {
+                    scales: {
+                      yAxes: [{
+                        scaleLabel: {
+                          display: true,
+                          labelString: 'Rating'
+                        }
+                      }],
+                      xAxes:[{
+                          scaleLabel:{
+                              display:true,
+                              labelString:'Rank'
+                          }
+                      }]
+                    }     
+                  }
+            })
+            .setWidth(800)
+            .setHeight(400);
+            //making chart according to chart.js
+            
+            //convertint to json so that quickchart which uses this json to convert chart into pic
+            const chartUrl = await chart.getShortUrl();
+            //console.log(chartUrl)
+            const chartEmbed = {
+                title: words[1],
+                description: 'Rating Graph',
+                image: {
+                  url: chartUrl,
+                },
+              };
+               msg.channel.send({ embed: chartEmbed });
+        }).catch((err)=>{
+            msg.channel.send('Send valid username!')
+         })
+    }
+    else if(msg.content.startsWith('$rating')){
         let words=msg.content.split(',');
         getRating(words[1]).then((val)=>{
             let msgg="";
@@ -39,8 +87,7 @@ client.on("message",(msg)=>{
         })
     }
 
-
-    if(msg.content.startsWith('$upcoming')){
+    else if(msg.content.startsWith('$upcoming')){
         getUpcoming().then((arr)=>{
          //   console.log(arr)
          arr.reverse();
@@ -52,6 +99,7 @@ client.on("message",(msg)=>{
             msg.channel.send(msgg)
         })
     }
+
 })
 
 //for songs

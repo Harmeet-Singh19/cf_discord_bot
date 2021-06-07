@@ -1,4 +1,5 @@
 const fetch= require('node-fetch')
+const {getLabels,getDatasets}=require('./util')
 
 
 const getRating=async(username)=>{
@@ -57,8 +58,38 @@ const getUpcoming=async()=>{
         }
     })
 }
+const getRatingGraph=async(username)=>{
+    let url=process.env.CF_BASEURL + 'user.rating?handle=' + username;
+    var data,dataGraph;
+    await fetch(url).then((res)=>res.json())
+
+    .then(async(res)=>{
+       
+        data=res;
+        //console.log(res.result)
+         dataGraph= await getDatasets(data.result);
+        //console.log(dataGraph)
+
+      //  console.log(res)
+    })
+
+    return new Promise( (resolve,reject)=>{
+       
+        if(data.status!='OK'){
+            const errorObject = {
+                msg: 'An error occured',
+                error, //...some error we got back
+             }
+             reject(errorObject);
+        }
+        else{
+            resolve(dataGraph);
+        }
+    })
+}
 
 module.exports={
     getRating,
-    getUpcoming
+    getUpcoming,
+    getRatingGraph
 }
