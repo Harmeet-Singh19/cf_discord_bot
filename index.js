@@ -4,6 +4,8 @@ const client=new Discord.Client()
 const {getRating, getUpcoming}=require('./api_calls/basic')
 const {UnixToDate}=require('./api_calls/util')
 const {execute}=require('./api_calls/song')
+const {getInfo,getURLVideoID,getVideoID}=require('ytdl-core')
+const ytdl = require("ytdl-core");
 client.login(process.env.BOT_ID)
 
 client.on("ready",()=>{
@@ -57,11 +59,10 @@ client.on("message",(msg)=>{
 client.on("message",async(msg)=>{
     const ServerQueue=queue.get(msg.guild.id);
     //for multiple servers, different song queues for them
-
+    //console.log(ServerQueue,msg.guild.id)
     if(msg.content.startsWith('$play')){
-        let final= execute(msg,ServerQueue,queue);
-
-        return msg.channel.send(final);
+        let final= await execute(msg,ServerQueue,queue);
+        return;
     } else if (msg.content.startsWith(`$skip`)) {
         await skip(msg, serverQueue);
         return;
@@ -70,3 +71,5 @@ client.on("message",async(msg)=>{
         return;
       }
 })
+
+

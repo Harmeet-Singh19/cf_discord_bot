@@ -10,13 +10,14 @@ const play=(guild,song,queue)=>{
     //guild for which VC's queue to play song in
 
     const serverQueue=queue.get(guild.id);
+   // console.log(serverQueue)
     if (!song) {
         serverQueue.voiceChannel.leave();
         queue.delete(guild.id);
         return;
       }
       const dispatcher = serverQueue.connection
-      .play(ytdl(song.url),{ quality: 'highestaudio' })
+      .play(ytdl(song.url))
       .on("finish", () => {
         serverQueue.songs.shift();
         play(guild, serverQueue.songs[0]);
@@ -28,23 +29,29 @@ const play=(guild,song,queue)=>{
 
 const execute=async(msg,ServerQueue,queue)=>{
     const words=msg.content.split(",");
-    console.log(words)
+    //console.log(words)
     const currVC=msg.member.voice.channel;
     //member is a different guild object, where voice is also one(VOICESTATE), channel inside voice indicated voice cahnnel not text channel
     if(!currVC){
-        return "You need to be in a voice channel to play the playlist! (stupid)";
+      //  console.log("gg")
+        msg.channel.send("You need to be in a voice channel to play the playlist! (stupid)");
     }
     //now use ytdl library to get information of every song in our playlist
     let msgg="";
     let idx=1;
-    for(s in songs[words[1]]){
+    //console.log(songs[words[1]])
+    songs[words[1]].forEach(async(s)=>{
+       // console.log(s)
         const fullSongInfo=await getInfo(s);
         const song={
             title: fullSongInfo.videoDetails.title,
             url: fullSongInfo.videoDetails.video_url,}
+            msgg+=`${idx} : ${song.title} \n`;
+        idx++;  
         //if original channels queue is empty, no songs playing
-
-        if(!ServerQueue){
+        //console.log(song)
+        if(ServerQueue==undefined){
+            console.log("newqueue")
             const NewQueueForCurrVC={
                 textChannel: msg.channel,
                 voiceChannel: currVC,
@@ -54,28 +61,29 @@ const execute=async(msg,ServerQueue,queue)=>{
                 playing: true
             };
             //setting this newquue, in our map for this VC
-            queue.set(msg.guild.id,ServerQueue);
+            queue.set(msg.guild.id,NewQueueForCurrVC);
 
             NewQueueForCurrVC.songs.push(song);
             //as no song is currently playong, we will try to connect it to VC
             try{
                 var connection = await currVC.join();
                 NewQueueForCurrVC.connection = connection;
-                play(msg.guild, NewQueueForCurrVC.songs[0],queue);//play is another function to add the song to playlist
+                await play(msg.guild, NewQueueForCurrVC.songs[0],queue);//play is another function to add the song to playlist
             }catch (err) {
                 console.log(err);
                 queue.delete(msg.guild.id);
-                return err;
+                msg.channel.send('error');
               }
 
         }
         else{
             ServerQueue.songs.push(song);
         }
-        msgg+=`${idx} : ${song.title} `;
-    }
-    return msgg;
-} 
+    })
+    console.log(msgg);
+    await msg.channel.send(msgg)
+    return ;
+}
 
 
 module.exports={
