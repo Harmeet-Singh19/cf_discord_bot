@@ -88,8 +88,47 @@ const getRatingGraph=async(username)=>{
     })
 }
 
+
+const getInformation = async(username)=>{
+    let url=process.env.CF_BASEURL + 'user.info?handles=' + username + ';';
+    var data;
+    var info;
+    console.log(url);
+    await fetch(url).then((res)=>res.json())
+    .then((res)=>{
+       
+        data=res;
+        //console.log(res)
+      //  console.log(res);
+        let arr=res.result;
+        info=arr[0];
+      //  console.log(info)
+        //contest=arr[arr.length-1]
+        //console.log(arr);
+        //console.log(contest)
+    })
+
+    return new Promise( (resolve,reject)=>{
+       
+        if(data.status!='OK'){
+         //   console.log(data.status)
+            const errorObject = {
+                msg: 'An error occured',
+                error, //...some error we got back
+             }
+             console.log(errorObject.error)
+             reject(errorObject);
+        }
+        else{
+            resolve(info);
+        }
+    })
+}
+
+
 module.exports={
     getRating,
     getUpcoming,
-    getRatingGraph
+    getRatingGraph,
+    getInformation
 }

@@ -4,7 +4,7 @@ const client=new Discord.Client()
 const {getInfo,getURLVideoID,getVideoID}=require('ytdl-core')
 const ytdl = require("ytdl-core");
 const quickchart= require('quickchart-js')
-const {getRating, getUpcoming,getRatingGraph}=require('./api_calls/basic')
+const {getRating, getUpcoming,getRatingGraph,getInformation}=require('./api_calls/basic')
 const {UnixToDate}=require('./api_calls/util')
 const {execute,skip,destroy}=require('./api_calls/song')
 client.login(process.env.BOT_ID)
@@ -98,6 +98,25 @@ client.on("message",(msg)=>{
             });
             msg.channel.send(msgg)
         })
+    }
+    else if(msg.content.startsWith('$info')){
+        let words=msg.content.split(',');
+        console.log(words);
+        getInformation(words[1]).then((val)=>{
+            let msgg="";
+            
+            
+            msgg='Name: ' + val.firstName + ' ' + val.lastName + '\n';
+            msgg+='Country: ' + val.country +'\n';
+            msgg+='Rank: ' + val.rank + '\n';
+
+            msg.channel.send(msgg)
+            msg.channel.send('Profile Pic: ',{files: [val.titlePhoto]});
+        }).catch((err)=>{
+            console.log(err)
+            msg.channel.send('Send valid username!')
+        })
+    
     }
 
 })
