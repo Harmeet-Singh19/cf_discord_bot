@@ -43,10 +43,61 @@ const getDatasets=(data)=>{
   //console.log(dataGraph.datasets)
   return dataGraph
 }
+const getMonthName = monthIndex => {
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December"
+  ];
+  return months[monthIndex];
+};
+const countSubmissions = async (submissions, verdict,startTime,endTime) =>{
+  var count;
+  var arr;
+  //console.log(submissions,verdict)
+  if(verdict=== "ALL"){
+    count =submissions.length 
+    arr = submissions;
+  }
+  else{
+    
+    arr = submissions.filter((submission) => { return submission.verdict == verdict})
+
+  }
+  //console.log(arr,verdict);
+  arr = arr.filter((ele) => {return ele.creationTimeSeconds>=startTime});
+ // console.log(arr,verdict);
+  return arr.length;
+
+
+}
+
+
+
+const getSub =async (submissions,startTime,endTime) => {
+const all = await countSubmissions(submissions, "ALL",startTime,endTime);
+const ac = await countSubmissions(submissions, "OK",startTime,endTime);
+const wa = await countSubmissions(submissions, "WRONG_ANSWER",startTime,endTime);
+const tle = await countSubmissions(submissions, "TIME_LIMIT_EXCEEDED",startTime,endTime);
+const others = all - (ac + wa + tle);
+return [ac, wa, tle, others];
+};
+
 
 
 
 module.exports={
     UnixToDate,
     getDatasets,
+    getMonthName,
+    getSub
 }

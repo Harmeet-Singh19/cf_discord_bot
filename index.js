@@ -2,7 +2,7 @@ require("dotenv").config();
 const Discord=require("discord.js");
 const client=new Discord.Client()
 const quickchart= require('quickchart-js')
-const {getRating, getUpcoming,getRatingGraph,getInformation,googleQues,getVirtualList,getPredProblemSet}=require('./api_calls/basic')
+const {getRating, getUpcoming,getRatingGraph,getInformation,googleQues,getVirtualList,getPredProblemSet,getStatus}=require('./api_calls/basic')
 const {UnixToDate}=require('./api_calls/util')
 const {execute,skip,destroy}=require('./api_calls/song')
 const {pred}=require('./api_calls/chatbot1')
@@ -326,7 +326,60 @@ client.on("message",(msg)=>{
             console.log(err)
             msg.channel.send("Error")
         })
+    }else if(msg.content.startsWith('$Status') || msg.content.startsWith('$status') ){
+        let words=msg.content.split(',');
+        
+
+        getStatus(words[1]).then(async(val)=>{
+            let msgg="";
+            //console.log(val.datasets)
+            const chart= new quickchart();
+            console.log(val);
+            chart.setConfig({
+                type:'doughnut',
+                data:{
+                    labels:["AC","WA","TLE","Others"],
+                    datasets:[
+                        {
+                            label:"Submissions Statistics",
+                            data: val,
+                            
+                            backgroundColor:[
+                                "rgba(75, 192, 192, 1)",
+                                "rgba(255, 99, 132, 1)",
+                                "rgba(54, 162, 235, 1)",
+                                "rgba(255, 206, 86, 1)"
+                            ]
+                        }
+                    ]
+                },
+                options : {
+                    legend:{
+                        position: "bottom"
+                    },
+                    weight: 4
+                  }
+            })
+            .setWidth(800)
+            .setHeight(400);
+            //making chart according to chart.js
+            
+            //convertint to json so that quickchart which uses this json to convert chart into pic
+            const chartUrl = await chart.getShortUrl();
+            //console.log(chartUrl)
+            const chartEmbed = {
+                title: words[1],
+                description: 'Submission Stats',
+                image: {
+                  url: chartUrl,
+                },
+              };
+               msg.channel.send({ embed: chartEmbed });
+        }).catch((err)=>{
+            msg.channel.send('Send valid username!')
+         })
     }
+
 
 })
 

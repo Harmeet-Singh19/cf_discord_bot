@@ -1,5 +1,5 @@
 const fetch= require('node-fetch')
-const {getDatasets}=require('./util')
+const {getDatasets,getMonthName,getSub}=require('./util')
 const  googleIt = require('google-it');
 
 
@@ -284,6 +284,44 @@ const googleQues=async(ques)=>{
         resolve(res);
     })
 }
+const getStatus = async(username) =>{
+    let url=process.env.CF_BASEURL + 'user.status?handle=' + username;
+    var data;
+    var SubGraph;
+  //  console.log(url);
+    await fetch(url).then((res)=>res.json())
+    .then(async(res)=>{
+       
+        data=res;
+        const currentDate = new Date();
+        const day = currentDate.getDate();
+        const month = currentDate.getMonth();
+        const year = currentDate.getFullYear();
+        const dateString = `${day} ${getMonthName(month)} ${year}`;
+        const timeStamp = new Date(dateString).getTime();
+        //console.log(timeStamp);
+        const prev = `${day} ${getMonthName(month-1)} ${year}`;
+        const prevtimeStamp = new Date(prev).getTime();
+        console.log(prevtimeStamp,timeStamp);
+        //console.log(res)
+        SubGraph= await (getSub(data.result,prevtimeStamp/1000,timeStamp/1000));
+        console.log(SubGraph)
+        
+    })
+    return new Promise( (resolve,reject)=>{
+       
+        if(data.status!='OK'){
+            const errorObject = {
+                msg: 'An error occured',
+                error, //...some error we got back
+             }
+             reject(errorObject);
+        }
+        else{
+            resolve(SubGraph);
+        }
+    })
+}
 
 
 module.exports={
@@ -293,5 +331,6 @@ module.exports={
     getInformation,
     googleQues,
     getVirtualList,
-    getPredProblemSet
+    getPredProblemSet,
+    getStatus
 }
