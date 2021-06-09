@@ -1,3 +1,5 @@
+const  googleIt = require('google-it');
+
 const UnixToDate=(UNIX_timestamp)=>{
       var a = new Date(UNIX_timestamp * 1000);
     var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -17,37 +19,34 @@ const UnixToDate=(UNIX_timestamp)=>{
     return time;
 }
 
-const getLabels=(data)=>{
-  
-  console.log(arr,"LAbels")
-  return arr;
-}
-const getDatasets=(data)=>{
-  const dataGraph={};
-  let arr=[];
-  data.forEach((val)=>{
-    arr.push( val.rank)
-    //console.log(val.contestName + ":" + val.rank)
-  })
-  //console.log(arr,"labels")
-  dataGraph.labels=arr
-  let ratings=[];
-  data.forEach((val)=>{
-    ratings.push(val.newRating);
-  })
-  //console.log(ratings,"ratings")
-  var datasets=[];
-  datasets.push({label:'Rating changes',data:ratings,
-  borderColor:'#000080',
 
-})
-dataGraph.datasets=datasets;
-//console.log(dataGraph.datasets)
-return dataGraph
+const getDatasets=(data)=>{
+    const dataGraph={};
+    let arr=[];
+    data.forEach((val)=>{
+      arr.push( val.rank)
+      //console.log(val.contestName + ":" + val.rank)
+    })
+    //console.log(arr,"labels")
+    dataGraph.labels=arr
+    let ratings=[];
+    data.forEach((val)=>{
+      ratings.push(val.newRating);
+    })
+    //console.log(ratings,"ratings")
+    var datasets=[];
+    datasets.push({label:'Rating changes',data:ratings,
+    borderColor:'#000080',
+
+  })
+  dataGraph.datasets=datasets;
+  //console.log(dataGraph.datasets)
+  return dataGraph
 }
+
+
 
 module.exports={
     UnixToDate,
     getDatasets,
-    getLabels
 }
