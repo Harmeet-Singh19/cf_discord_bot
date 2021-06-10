@@ -44,6 +44,7 @@ client.on("ready",()=>{
                                 //client.channels.cache.get(`${channelId}`).send(`<@${member.user.id}>`);
                                 let rank;
                                 if(val.newRating>=1900){
+                                    
                                     rank="Candidate Master";
                                 }
                                 else if(val.newRating>=1600){
@@ -98,21 +99,87 @@ client.on("message",async(msg)=>{
     if(msg.content.startsWith('$set')){
         let words=msg.content.split(',');
         ids.set(msg.author.id,words[1]);
+        await getLastRatingChange(words[1]).then((val)=>{
+            lastRating.set(msg.author.id,val);
+        })
         await getInformation(words[1]).then((info)=>{
             users.set(msg.author.id,info);
             let url="https://codeforces.com/profile/"+words[1];
             let cf=(words[1]);
-            let myEmbed= new Discord.MessageEmbed()
-            .setColor('#0099ff')
-            .setURL(url)
-            .setDescription(`CF handle for <@${msg.author.id}> registered. [**${cf}**](${url})`)
-            .addField('MaxRating: ',info.maxRating,)
-            .addField('Last Online: ',UnixToDate(info.lastOnlineTimeSeconds))
-            msg.channel.send(myEmbed)
+            let list=client.guilds.cache.get(serverId);
+            let role = list.roles.cache.find(r => r.name === info.rank);
+            var color ;
+            let rank=['pupil','specialist','expert','candidate master', 'master']
+            if(info.rank === 'pupil'){
+                color='GREEN';
+            }
+            else if(info.rank === 'specialist'){
+                color='AQUA'
+            }
+            else if(info.rank === 'expert'){
+                color='BLUE';
+            }
+            else if(info.rank==='candidate master'){
+                color='PURPLE'
+            }
+            else if(info.rank === 'master'){
+                color = 'YELLOW'
+            }
+            else if(info.rank === 'international master'){
+                color = 'ORANGE'
+            }
+            else{
+                color = 'RED'
+            }
+            if(!role){
+                list.roles.create({
+                data: {
+                  name: info.rank,
+                  setHoist: true,
+                  color: color,
+                },
+                reason: 'mdskcmasdfasdjfkjasdfkjsda',
+              })
+                .then(() => {
+                    let roles =  list.roles.cache.find(r => r.name === info.rank)
+                    roles.setHoist(true)
+                    .then(updated => console.log(`Role hoisted: ${updated.hoist}`))
+                    .catch(console.error);
+                    rank.forEach(element => {
+                        let role1 =  list.roles.cache.find(r => r.name === element)
+                        msg.member.roles.remove(role1)
+                    });
+                    
+                    msg.member.roles.add(roles).catch(console.error);
+                       
+                   
+                   let myEmbed= new Discord.MessageEmbed()
+                   .setColor('#0099ff')
+                   .setDescription(`CF handle for <@${msg.author.id}> registered. [${cf}](${url})`)
+                   .addField('MaxRating: ',info.maxRating,)
+                   .addField('Last Online: ',UnixToDate(info.lastOnlineTimeSeconds))
+                   .addField('Role added: ', info.rank)
+                   msg.channel.send(myEmbed)
+                } )
+                .catch(console.error);
+
+                
+                return
+            }
+                        let roles =  list.roles.cache.find(r => r.name === info.rank)
+                    
+                       msg.member.roles.add(roles).catch(console.error);
+                       
+                   
+                   let myEmbed= new Discord.MessageEmbed()
+                   .setColor('#0099ff')
+                   .setDescription(`CF handle for <@${msg.author.id}> registered. [${cf}](${url})`)
+                   .addField('MaxRating: ',info.maxRating,)
+                   .addField('Last Online: ',UnixToDate(info.lastOnlineTimeSeconds))
+                   .addField('Role added: ', info.rank)
+                   msg.channel.send(myEmbed)
         })
-        await getLastRatingChange(words[1]).then((val)=>{
-            lastRating.set(msg.author.id,val);
-        })
+        
     }
 })
 
