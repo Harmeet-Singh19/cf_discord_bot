@@ -1,5 +1,5 @@
 const fetch= require('node-fetch')
-const {getDatasets,getMonthName,getSub}=require('./util')
+const {getDatasets,getMonthName,getSub,getCorrect,getFinalPoints}=require('./util')
 const  googleIt = require('google-it');
 
 
@@ -25,6 +25,29 @@ const getRating=async(username)=>{
         }
         else{
             resolve(data);
+        }
+    })
+}
+
+const getLastRatingChange=async(cf_username)=>{
+    let url=process.env.CF_BASEURL + 'user.rating?handle=' + cf_username;
+    var data;
+    await fetch(url).then((res)=>res.json())
+
+    .then((res)=>{
+       
+        data=res;
+      //  console.log(res)
+    })
+
+    return new Promise( (resolve,reject)=>{
+       
+        if(data.status!='OK'){
+            
+             reject("Error");
+        }
+        else{
+            resolve(data.result[data.result.length-1]);
         }
     })
 }
@@ -131,27 +154,43 @@ const getVirtualList=async(cf_username,msg)=>{
         })
        // console.log(orig)
          getDivPart(orig).then(async(res)=>{
-             let msgg="Div 1 Contest in which you havent solved a problem: \n";
+             //let msgg="Div 1 Contest in which you havent solved a problem: \n";
+             let temp=[];
              await res.div1.forEach(async(contest,idx)=>{
                  let link="<"+"https://codeforces.com/contest/"+contest.id +">";
-                 msgg+=(idx+1)+": " + contest.name + "\n";
-                 msgg+='Link: ' +link + "\n" ;
+                 temp.push({name:(idx+1)+": " + contest.name,value:`[**Link:**](${link})`})
              })
-             msg.channel.send(msgg);
-              msgg="Div 2 Contest in which you havent solved a problem: \n";
-              await res.div2.forEach(async(contest,idx)=>{
+             let msgg={
+                color: 0x0099ff,
+	            title: "Div 1 Contest in which you havent solved a problem: ",
+                fields:temp,
+
+            }
+            msg.channel.send({embed:msgg});
+             temp=[];
+            await res.div2.forEach(async(contest,idx)=>{
                 let link="<"+"https://codeforces.com/contest/"+contest.id +">";
-                 msgg+=(idx+1)+": " + contest.name + "\n";
-                 msgg+='Link: ' +link + "\n" ;
-             })
-             msg.channel.send(msgg);
-              msgg="Div 3 Contest in which you havent solved a problem: \n";
-              await res.div3.forEach(async(contest,idx)=>{
-                let link="<"+"https://codeforces.com/contest/"+contest.id +">";
-                 msgg+=(idx+1)+": " + contest.name + "\n";
-                 msgg+='Link: ' +link + "\n" ;
-             })
-             msg.channel.send(msgg);
+                temp.push({name:(idx+1)+": " + contest.name,value:`[**Link:**](${link})`})
+            })
+             msgg={
+               color: 0x0099ff,
+               title: "Div 2 Contest in which you havent solved a problem: ",
+               fields:temp,
+
+           }
+           msg.channel.send({embed:msgg});
+           temp=[];
+           await res.div3.forEach(async(contest,idx)=>{
+               let link="<"+"https://codeforces.com/contest/"+contest.id +">";
+               temp.push({name:(idx+1)+": " + contest.name,value:`[**Link:**](${link})`})
+           })
+            msgg={
+              color: 0x0099ff,
+              title: "Div 3 Contest in which you havent solved a problem: ",
+              fields:temp,
+
+          }
+          msg.channel.send({embed:msgg});
              msg.channel.send("Good-Bye, hope I could be of help!")
          })
     })
@@ -235,12 +274,12 @@ const getPredProblemSet=async(rating,msg,tc)=>{
                 //console.log(p.rating,rating)
                 let link="<https://codeforces.com/problemset/problem/"+p.contestId+"/"+p.index+">";
                 if(p.rating==rating+100){
-                    probs.high.push({name:p.name,scnt:m.get(p.contestId+p.index),link:link});
+                    probs.high.push({name:p.name,scnt:m.get(p.contestId+p.index),link:link,contestId:p.contestId,index:p.index});
                 }else if(p.rating==rating){
-                    probs.same.push({name:p.name,scnt:m.get(p.contestId+p.index),link:link});
+                    probs.same.push({name:p.name,scnt:m.get(p.contestId+p.index),link:link,contestId:p.contestId,index:p.index});
                 }
                 else if(p.rating==rating-100){
-                    probs.low.push({name:p.name,scnt:m.get(p.contestId+p.index),link:link});
+                    probs.low.push({name:p.name,scnt:m.get(p.contestId+p.index),link:link,contestId:p.contestId,index:p.index});
                 }
 
             })
@@ -271,6 +310,88 @@ const getPredProblemSet=async(rating,msg,tc)=>{
     })
 }
 
+const getVirtualQues=async(avgR,msg)=>{
+    console.log(avgR)
+    var rating,data;
+    var probs={high:[],low:[],same:[],loww:[]};
+    rating=avgR;
+    let url=process.env.CF_BASEURL+'problemset.problems';
+        var m=new Map();
+        
+        await fetch(url).then((res)=>res.json())
+        .then((res)=>{
+            data=res;
+            let problems=res.result.problems,problemstats=res.result.problemStatistics
+            //console.log(problems,"Data");
+            problemstats.forEach((ps)=>{
+                m.set(ps.contestId+ps.index,ps.solvedCount);
+            })
+            problems.forEach((p)=>{
+                //console.log(p.rating,rating)
+                let link="<https://codeforces.com/problemset/problem/"+p.contestId+"/"+p.index+">";
+                if(p.rating==rating+100){
+                    probs.high.push({name:p.name,scnt:m.get(p.contestId+p.index),link:link,contestId:p.contestId,index:p.index});
+                }else if(p.rating==rating){
+                    probs.same.push({name:p.name,scnt:m.get(p.contestId+p.index),link:link,contestId:p.contestId,index:p.index});
+                }
+                else if(p.rating==rating-100){
+                    probs.low.push({name:p.name,scnt:m.get(p.contestId+p.index),link:link,contestId:p.contestId,index:p.index});
+                }else if(p.rating==rating-200){
+                    probs.loww.push({name:p.name,scnt:m.get(p.contestId+p.index),link:link,contestId:p.contestId,index:p.index});
+                }
+
+
+            })
+            probs.high.sort((a,b)=>{
+                return b.scnt-a.scnt;
+            })
+            probs.same.sort((a,b)=>{
+                return b.scnt-a.scnt;
+            })
+            probs.low.sort((a,b)=>{
+                return b.scnt-a.scnt;
+            })
+            probs.loww.sort((a,b)=>{
+                return b.scnt-a.scnt;
+            })
+            probs.rating=rating
+        })
+        return new Promise((resolve,reject)=>{
+        if(data.status!='OK'){
+            const errorObject = {
+                msg: 'An error occured',
+                error, //...some error we got back
+             }
+             console.log(errorObject.error)
+             reject(errorObject);
+        }else{
+            resolve(probs);
+        }
+    })
+    
+}
+const getPoints=async(cf_username,questions,currentDate)=>{
+    let url=process.env.CF_BASEURL + 'user.status?handle=' + cf_username  ;
+    var data,points,questions=questions;
+
+    await fetch(url).then((res)=>res.json())
+    .then(async(res)=>{
+        data=res;
+        const startTimeStamp=Math.round(currentDate/1000)-4*60;
+        const endTimeStamp=startTimeStamp+60*60;
+       // console.log(startTimeStamp,endTimeStamp,question)
+       //console.log(res)
+        points=await getFinalPoints(res.result,questions,startTimeStamp,endTimeStamp);
+       // console.log(points,cf_username)
+    })
+    return new Promise((resolve,reject)=>{
+        if(data.status!="OK"){
+            reject("Error")
+        }
+        resolve(points);
+    })
+}
+//1623307874
 const googleQues=async(ques)=>{
     var res;
     await googleIt({'query':ques}).then(results=>{
@@ -284,6 +405,45 @@ const googleQues=async(ques)=>{
         resolve(res);
     })
 }
+const getAC = async(username) =>{
+    let url=process.env.CF_BASEURL + 'user.status?handle=' + username;
+    var data;
+    var SubGraph;
+  //  console.log(url);
+    await fetch(url).then((res)=>res.json())
+    .then(async(res)=>{
+       
+        data=res;
+        const currentDate = new Date();
+        const day = currentDate.getDate();
+        const month = currentDate.getMonth();
+        const year = currentDate.getFullYear();
+        const dateString = `${day} ${getMonthName(month)} ${year}`;
+        const timeStamp = new Date(dateString).getTime();
+        //console.log(timeStamp);
+        const prev = `${day} ${getMonthName(month-1)} ${year}`;
+        const prevtimeStamp = new Date(prev).getTime();
+      //  console.log(prevtimeStamp,timeStamp);
+        //console.log(res)
+        SubGraph= await (getCorrect(data.result,prevtimeStamp/1000,timeStamp/1000));
+        //console.log(SubGraph)
+        
+    })
+    return new Promise( (resolve,reject)=>{
+       
+        if(data.status!='OK'){
+            const errorObject = {
+                msg: 'An error occured',
+                error, //...some error we got back
+             }
+             reject(errorObject);
+        }
+        else{
+            resolve(SubGraph);
+        }
+    })
+}
+
 const getStatus = async(username) =>{
     let url=process.env.CF_BASEURL + 'user.status?handle=' + username;
     var data;
@@ -302,10 +462,10 @@ const getStatus = async(username) =>{
         //console.log(timeStamp);
         const prev = `${day} ${getMonthName(month-1)} ${year}`;
         const prevtimeStamp = new Date(prev).getTime();
-        console.log(prevtimeStamp,timeStamp);
+      //  console.log(prevtimeStamp,timeStamp);
         //console.log(res)
         SubGraph= await (getSub(data.result,prevtimeStamp/1000,timeStamp/1000));
-        console.log(SubGraph)
+        //console.log(SubGraph)
         
     })
     return new Promise( (resolve,reject)=>{
@@ -322,6 +482,22 @@ const getStatus = async(username) =>{
         }
     })
 }
+const getContestName=async(contestId)=>{
+    let url= process.env.CF_BASEURL+"contest.ratingChanges?contestId="+contestId;
+    var data;
+    await fetch(url).then((res)=>console.log(res))
+    .then((res)=>{
+        data=res;
+
+    })
+    return new Promise((resolve,reject)=>{
+        if(data.status!='OK'){
+            reject("Codeforces API DOWN.")
+        }else{
+            resolve(data.result[0].contestName)
+        }
+    })
+}
 
 
 module.exports={
@@ -332,5 +508,10 @@ module.exports={
     googleQues,
     getVirtualList,
     getPredProblemSet,
-    getStatus
+    getStatus,
+    getAC,
+    getVirtualQues,
+    getPoints,
+    getLastRatingChange,
+    getContestName
 }

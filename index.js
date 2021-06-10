@@ -2,15 +2,81 @@ require("dotenv").config();
 const Discord=require("discord.js");
 const client=new Discord.Client()
 const quickchart= require('quickchart-js')
-const {getRating, getUpcoming,getRatingGraph,getInformation,googleQues,getVirtualList,getPredProblemSet,getStatus}=require('./api_calls/basic')
+const {getRating, getUpcoming,getRatingGraph,getInformation,googleQues,getVirtualList,getPredProblemSet,getAC
+,getVirtualQues,getStatus,getPoints,getLastRatingChange,getContestName}=require('./api_calls/basic')
 const {UnixToDate}=require('./api_calls/util')
 const {execute,skip,destroy}=require('./api_calls/song')
 const {pred}=require('./api_calls/chatbot1')
 client.login(process.env.BOT_ID)
 
+const lastRating= new Map();
+const queue=new Map();
+const ids=new Map();
+let serverId,channelId
+
+let chatnow=false;
+let userId=undefined;
+let users=new Map();
+let questions=[];
+
 client.on("ready",()=>{
     console.log(`Logged in as ${client.user.tag}`);
    client.user.setActivity("You grow as a beautiful human-being", { type: 'WATCHING' })
+   setTimeout(async ()=>{ 
+        //sendMessage(); // send the message once
+        
+        var dayMillseconds = 1000 * 60 * 10 * 1;
+        setInterval(async function(){ // repeat this every 24 hours
+          //  sendMessage();
+          //console.log(serverId)
+            if(serverId){
+                let list=client.guilds.cache.get(serverId);
+                let channel=client.channels.cache.get(`${channelId}`)
+                var traverse=await list.members.cache.map ( async(member)=>{
+                    let info=users.get(member.user.id);
+                    //console.log(info)
+                    if(info){ 
+                        await getLastRatingChange(info.handle).then(async(val)=>{
+                           // console.log(channel,"dd")
+                           //console.log(lastRating.get(member.user.id),val)
+                            if(lastRating.get(member.user.id).ratingUpdateTimeSeconds!=val.ratingUpdateTimeSeconds){
+                                //console.log(val,"val")
+                                //client.channels.cache.get(`${channelId}`).send(`<@${member.user.id}>`);
+                                let rank;
+                                if(val.newRating>=1900){
+                                    rank="Candidate Master";
+                                }
+                                else if(val.newRating>=1600){
+                                    rank="Expert";
+                                }
+                                else if(val.newRating>=1400){
+                                    rank="Specialist"
+                                }
+                                else{
+                                    rank="Pupil"
+                                }
+                                //console.log(rank)
+                                let url="https://codeforces.com/profile/"+info.handle;
+                                let cf=(info.handle);
+                                let myEmbed= new Discord.MessageEmbed()
+                                .setColor('#0099ff')
+                                .setURL(url)
+                                .setDescription(`Rating for <@${member.user.id}> got updated. [**${cf}**](${url})`)
+                                .addField('Old Rating: ',info.rating,)
+                                .addField('New Rating: ',val.newRating)
+                                .addField('Updated Rank: ',rank)
+                                client.channels.cache.get(`${channelId}`).send(myEmbed)
+                                client.users.cache.get(`${member.user.id}`).send(myEmbed)
+                            }
+                        }).catch((err)=>{
+                            console.log(err)
+                        })
+                    }
+                })
+          }
+          
+        }, dayMillseconds)
+    }, 0)
 })
 client.once("reconnecting", () => {
     console.log("Reconnecting!");
@@ -20,14 +86,13 @@ client.once("disconnect", () => {
     console.log("Disconnect!");
 });
 
-const queue=new Map();
-const ids=new Map();
 
-let chatnow=false;
-let userId=undefined;
-let users=new Map();
 //set handle
 client.on("message",async(msg)=>{
+   if(!msg.guild) return;
+   // console.log(serverId)
+   serverId=msg.guild.id
+   channelId=msg.channel.id
     if (msg.author.bot) return;
     if (!msg.content.startsWith('$')) return;
     if(msg.content.startsWith('$set')){
@@ -40,15 +105,21 @@ client.on("message",async(msg)=>{
             let myEmbed= new Discord.MessageEmbed()
             .setColor('#0099ff')
             .setURL(url)
-            .setDescription(`CF handle for <@${msg.author.id}> registered. [${cf}](${url})`)
+            .setDescription(`CF handle for <@${msg.author.id}> registered. [**${cf}**](${url})`)
             .addField('MaxRating: ',info.maxRating,)
             .addField('Last Online: ',UnixToDate(info.lastOnlineTimeSeconds))
             msg.channel.send(myEmbed)
         })
+        await getLastRatingChange(words[1]).then((val)=>{
+            lastRating.set(msg.author.id,val);
+        })
     }
 })
 
+//messaging,chat bot,Predicted Probles/Virtual helper
+
 client.on("message",async(msg)=>{
+    if(!msg.guild) return;
     if (msg.author.bot) return;
     if(msg.content.startsWith('$bye') &&userId!=undefined){
         if(msg.author.id!=userId){
@@ -138,38 +209,59 @@ client.on("message",async(msg)=>{
         let words=msg.content.split(',');
         let  rating=users.get(msg.author.id).rating,topic=words[1];
         
-        getPredProblemSet(rating,msg,topic).then((res)=>{
+        getPredProblemSet(rating,msg,topic).then(async(res)=>{
             
            msg.channel.send('Here are some recommended question to strengthen '+ topic);
             res.high.length=6;
-            let msgg="Rating "+ (res.rating+100) + ": \n\n";
-            res.high.forEach((p)=>{
-                msgg+=p.name +" \n No of Submissions: "+ p.scnt+  '\n';
-                msgg+="Link: "+p.link +"\n"
+            let temp=[]
+             res.high.map(async(p)=>{
+                let link="https://codeforces.com/problemset/problem/"+p.contestId+"/"+p.index;
+                temp.push({name:p.name,value:"Submission Count: "+p.scnt +"  |  "  + ` [**Link**](${link})  `,inline:false})
+                return p;
             })
-            msgg+='\n\n'
+            let msgg={
+                color: 0x0099ff,
+	            title: 'Rating ' + rating+100 +" :",
+                fields:temp,
+
+            }
+            msg.channel.send({embed:msgg});
             res.same.length=6;
-             msgg+="Rating "+ (res.rating) + ": \n\n";
-            res.same.forEach((p)=>{
-                msgg+=p.name +" \n No of Submissions: "+ p.scnt+ '\n';
-                msgg+="Link: "+p.link +"\n"
+             temp=[]
+             res.same.map(async(p)=>{
+                let link="https://codeforces.com/problemset/problem/"+p.contestId+"/"+p.index;
+                temp.push({name:p.name,value:"Submission Count: "+p.scnt +"  |  "  + ` [**Link**](${link})  `,inline:false})
+                return p;
             })
-            msgg+='\n\n'
+             msgg={
+                color: 0x0099ff,
+	            title: 'Rating ' + rating +" :",
+                fields:temp,
+
+            }
+            msg.channel.send({embed:msgg});
             res.low.length=6;
-             msgg+="Rating "+ (res.rating-100) + ": \n\n";
-            res.low.forEach((p)=>{
-                msgg+=p.name +" \n No of Submissions: "+ p.scnt+  '\n';
-                msgg+="Link: "+p.link +"\n"
+            temp=[]
+             res.low.map(async(p)=>{
+                let link="https://codeforces.com/problemset/problem/"+p.contestId+"/"+p.index;
+                temp.push({name:p.name,value:"Submission Count: "+p.scnt +"  |  "  + ` [**Link**](${link})  `,inline:false})
+                return p;
             })
-            msg.channel.send(msgg);
-            msg.channel.send("Good-Bye, hope I could be of help!")
-            chatnow=false;
-            userId=undefined;
-        })
-    }
+             msgg={
+                color: 0x0099ff,
+	            title: 'Rating ' + rating-100 +" :",
+                fields:temp,
+
+            }
+            msg.channel.send({embed:msgg});
+           
+    })
+}
 })
 
+//Rating, Rating graph, Pie Chart, info, google search basic funcs,
 client.on("message",(msg)=>{
+    if(!msg.guild) return;
     if (msg.author.bot) return;
     if (!msg.content.startsWith('$')) return;
     //to get the rating graph
@@ -259,6 +351,7 @@ client.on("message",(msg)=>{
     }
     //to get upcoming scheduled cf contests
     else if(msg.content.startsWith('$upcoming')){
+        channelId=msg.channel.id
         getUpcoming().then((arr)=>{
          arr.reverse();
             let temp=[]
@@ -383,9 +476,279 @@ client.on("message",(msg)=>{
 
 })
 
+//leaderboard of two types, one by no of problem solved in the last month, other by current rating
+
+client.on("message",async(msg)=>{
+    if(!msg.guild) return;
+    if (msg.author.bot) return;
+    if (!msg.content.startsWith('$')) return;
+    if(msg.content.startsWith('$lboard')){
+        let words=msg.content.split(',');
+        if(words[1]=='R'){
+            let temp=[];
+            let list=client.guilds.cache.get(serverId);
+            let arr=[];
+            list.members.cache.forEach((member)=>{
+               // console.log(member.user.id,member.user.username)
+               if(users.get(member.user.id)){
+                   let info=users.get(member.user.id)
+                   arr.push({username:member.user.tag,id:member.user.id,rating:info.rating,info:info})
+               }
+            })
+            arr.sort((a,b)=>b.rating-a.rating);
+            arr.forEach((me,idx)=>{
+                let link="https://codeforces.com/profile/"+me.info.handle;
+                temp.push({name:(idx+1)+`: ${me.username}` ,value:"Curr Rating: "+ me.rating +"    |   MaxRating: "+me.info.maxRating+`    |    [**${me.info.handle}**](${link})` })
+            })
+            let msgg={
+                color: 0x0099ff,
+	            title: 'Leaderboard :',
+                fields:temp,
+            }
+            msg.channel.send({embed:msgg});
+        }
+        else if(words[1]=='P'){
+            let temp=[];
+            let list=client.guilds.cache.get(serverId);
+            let x=false;
+            var arr=[];
+        //let cnt=0;
+//use .map on to traverse on , Map.map() return an array of promises of every item , use Promise.all() to implement further
+        var traverse=await list.members.cache.map(async(member)=>{
+            // console.log(member.user.id,member.user.username)
+            if(users.get(member.user.id)){
+                let info=users.get(member.user.id)
+                val= await getAC(info.handle);
+                arr.push({username:member.user.tag,id:member.user.id,prob:val[0],avgRating:val[1],info:info})
+            }
+            return member;
+        // console.log(i)
+        }) 
+        //console.log(traverse)
+        Promise.all(traverse).then((nm)=>{
+            arr.sort((a,b)=>b.prob-a.prob);
+            arr.forEach((me,idx)=>{
+                let link="https://codeforces.com/profile/"+me.info.handle;
+                temp.push({name:(idx+1)+`: ${me.username}` ,value:"Prob Solved: "+ me.prob +"    |   AvgRatingofProblem: "+me.avgRating+`    |    [**${me.info.handle}**](${link})` })
+            })
+            let msgg={
+                color: 0x0099ff,
+                title: 'Leaderboard :',
+                fields:temp,
+            }
+            msg.channel.send({embed:msgg});  
+        })
+            //console.log(arr)
+            //console.log("outside")
+        }
+    }
+})
+
+//Virtual Contest of 30 minutes
+client.on("message",async(msg)=>{
+    if(!msg.guild) return;
+    if(msg.author.bot) return;
+    if(!msg.content.startsWith("$")) return;
+    if(msg.content.startsWith("$virtual")){
+        if(!ids.get(msg.author.id)){
+            msg.channel.send('Please set your cf handle using "$set,{your_id} before using this command again!.\n ');
+            chatnow=false;
+            userId=undefined;
+            return;
+         }
+        let val="";
+        let list=client.guilds.cache.get(serverId);
+        list.members.cache.forEach((mem)=>{
+            if(users.get(mem.user.id)){
+                val+=`<@${mem.user.id}> |`
+            }
+        })
+        let msgg={
+            color: 0x0099ff,
+            title:'Virtual Contest (60mins), (4 questions)',
+            description:'The contest would begin in 5 minutes, the problem list along with link would provided at the start of the contest.',
+            fields:[{
+                name:'The bot would only consider submissions of registered users only:',
+                value:val,
+
+            }]
+        }
+        msg.channel.send({embed:msgg});
+         msgg={
+            color: 0x0099ff,
+            title:'Rules/Info',
+            fields:[{
+                name:'1. The problems are calculated according to the average rating of the users participating.',
+                value:':)'
+            },
+        {
+            name:'2. The problems provided would be in the increasing order of rating and thus, each one having more points weightage than its previous.',
+            value:' :)'
+        },{
+            name:'3. Please do not submit solution of any other question in between the contest.',
+            value:':) '
+        },
+        {
+            name:'4. A reminder would be provided 10 minutes before the Ending time of Contest.',
+            value:':) '
+        },
+        {
+            name:'5. Late submission carries equal penalty for all problems.',
+            value:':)'
+        }
+    ]
+        }
+        msg.channel.send({embed:msgg})
+        questions.length=0;
+        var startTime;
+        await setTimeout(async()=>{
+            let sum=0,cnt=0
+            list.members.cache.forEach((mem)=>{
+                if(users.get(mem.user.id)){
+                    let info=users.get(mem.user.id)
+                    sum+=info.rating
+                    cnt++;
+                }
+            })
+            let avgR=sum/cnt;
+            avgR/=100;
+            avgR=Math.round(avgR);
+            avgR*=100;
+            await getVirtualQues(avgR,msg).then((res)=>{
+                let temp=[]
+                let len=res.loww.length;
+                let idx=Math.floor(Math.random()*len)-1
+                let p=res.loww[idx];
+
+                let link="https://codeforces.com/problemset/problem/"+p.contestId+"/"+p.index;
+                temp.push({name:p.name,value: ` [**Link**](${link})   |  ` +"Points: "+100,inline:false});
+                questions.push({ques:p.contestId+p.index,points:100})
+
+                 len=res.low.length;
+                 idx=Math.floor(Math.random()*len)-1
+                 p=res.low[idx];
+
+                 link="https://codeforces.com/problemset/problem/"+p.contestId+"/"+p.index;
+                temp.push({name:p.name,value: ` [**Link**](${link})   |  ` +"Points: "+200,inline:false})
+                questions.push({ques:p.contestId+p.index,points:200})
+                
+                len=res.same.length;
+                idx=Math.floor(Math.random()*len)-1
+                p=res.same[idx];
+
+                link="https://codeforces.com/problemset/problem/"+p.contestId+"/"+p.index;
+               temp.push({name:p.name,value: ` [**Link**](${link})   |  ` +"Points: "+300,inline:false})
+               questions.push({ques:p.contestId+p.index,points:300})
+                
+               len=res.high.length;
+               idx=Math.floor(Math.random()*len)-1
+               p=res.high[idx];
+
+               link="https://codeforces.com/problemset/problem/"+p.contestId+"/"+p.index;
+              temp.push({name:p.name,value: ` [**Link**](${link})   |  ` +"Points: "+400,inline:false})
+              questions.push({ques:p.contestId+p.index,points:400});
+              startTime=new Date().getTime();
+                let msgg={
+                    color: 0x0099ff,
+                    title: '1 hour to Go, All the Best ',
+                    fields:temp,
+    
+                }
+                msg.channel.send({embed:msgg});
+            })
+
+            await setTimeout(async()=>{
+                msg.channel.send("10 minutes to go!")
+
+                await setTimeout(async()=>{
+                    let arr=[];
+                    let list=client.guilds.cache.get(serverId);
+                    var trav=[]
+                    //use .map on to traverse on , Map.map() return an array of promises of every item , use Promise.all() to implement further
+                     trav=await list.members.cache.map(async(mem)=>{
+                        if(users.get(mem.user.id)){
+                            let info=users.get(mem.user.id);
+                            let pts=await getPoints(info.handle,questions,startTime)
+                           // console.log(trav)
+                            let time="Minutes: "+ Math.round(pts[1]/60)%60  + ", Seconds: "+pts[1]%60;
+                            arr.push({point:pts[0],lastTime:time,info:info,username:mem.user.tag,id:mem.user.id})
+                        }
+                        return mem;
+                    })
+                    //console.log(trav)
+                    let temp=[]
+                    await Promise.all(trav).then((nm)=>{
+                        arr.sort((a,b)=>b.pts-a.pts);
+                        arr.forEach((me,idx)=>{
+                            let link="https://codeforces.com/profile/"+me.info.handle;
+                            temp.push({name:(idx+1)+`: ${me.username}` ,value:"Points Scored: "+ me.point +"    |   Time Taken(counted last correct submission): "+me.lastTime+`    |    [**${me.info.handle}**](${link})` })
+                        })
+                        let msgg={
+                            color: 0x0099ff,
+                            title: 'Final Standings :',
+                            fields:temp,
+                        }
+                        msg.channel.send({embed:msgg});  
+                        questions.length=0;
+                    })
+                    .catch((err)=>{
+                        console.log(err)
+                    })
+                },1000*60*9)
+
+
+            },1000*60*50)
+        },1000*1*4)
+    }
+    if(msg.content.startsWith("$standings")){
+        if(questions.length===0){
+            let msgg={
+                color: 0x0099ff,
+                title:"This command is only available during the virtual contest.\n Use $lboard,R/P for leaderboard",
+                
+            }
+            msg.channel.send({embed:msgg});
+            return;
+        }
+        let arr=[];
+        let list=client.guilds.cache.get(serverId);
+        var trav=[]
+        //use .map on to traverse on , Map.map() return an array of promises of every item , use Promise.all() to implement further
+            trav=await list.members.cache.map(async(mem)=>{
+            if(users.get(mem.user.id)){
+                let info=users.get(mem.user.id);
+                let pts=await getPoints(info.handle,questions,startTime)
+                // console.log(trav)
+                let time="Minutes: "+ Math.round(pts[1]/60)%60  + ", Seconds: "+pts[1]%60;
+                arr.push({point:pts[0],lastTime:time,info:info,username:mem.user.tag,id:mem.user.id})
+            }
+            return mem;
+        })
+        //console.log(trav)
+        let temp=[]
+        await Promise.all(trav).then((nm)=>{
+            arr.sort((a,b)=>b.pts-a.pts);
+            arr.forEach((me,idx)=>{
+                let link="https://codeforces.com/profile/"+me.info.handle;
+                temp.push({name:(idx+1)+`: ${me.username}` ,value:"Points Scored: "+ me.point +"    |   Time Taken(counted last correct submission): "+me.lastTime+`    |    [**${me.info.handle}**](${link})` })
+            })
+            let msgg={
+                color: 0x0099ff,
+                title: ' Current Standings :',
+                fields:temp,
+            }
+            msg.channel.send({embed:msgg});  
+        })
+        .catch((err)=>{
+            console.log(err)
+        })
+    }
+})
+ 
 //for songs
 
 client.on("message",async(msg)=>{
+    if(!msg.guild) return;
     const ServerQueue=queue.get(msg.guild.id);
     //for multiple servers, different song queues for them
     //console.log(ServerQueue,msg.guild.id)

@@ -1,5 +1,7 @@
 const  googleIt = require('google-it');
 
+
+
 const UnixToDate=(UNIX_timestamp)=>{
       var a = new Date(UNIX_timestamp * 1000);
     var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -80,6 +82,53 @@ const countSubmissions = async (submissions, verdict,startTime,endTime) =>{
 
 
 }
+const countAvg= async (submissions, verdict,startTime,endTime) =>{
+  var count;
+  var arr;
+  //console.log(submissions,verdict)
+  if(verdict=== "ALL"){
+    count =submissions.length 
+    arr = submissions;
+  }
+  else{
+    
+    arr = submissions.filter((submission) => { return submission.verdict == verdict})
+
+  }
+  //console.log(arr,verdict);
+  arr = arr.filter((ele) => {return ele.creationTimeSeconds>=startTime});
+  let sum=0;
+  arr.forEach((ele)=>{
+    sum+=ele.problem.rating;
+  })
+
+ // console.log(arr,verdict);
+  return sum/arr.length;
+
+
+}
+const getFinalPoints=async(submissions,questions,startTime,endTime)=>{
+  let ok=[]
+  //console.log(submissions)
+  ok=submissions.filter((ele)=>ele.verdict==="OK");
+  ok=ok.filter((ele)=>ele.creationTimeSeconds>=startTime && ele.creationTimeSeconds<=endTime);
+  let sum=0,lastTime=startTime;
+  ok.forEach((sub)=>{
+    //console.log(sub)
+    questions.forEach((ques)=>{
+      if(ques.ques==(sub.problem.contestId+sub.problem.index)){
+        sum+=ques.points;
+        sum-=Math.round((sub.creationTimeSeconds-startTime)/40);
+      }
+    })
+    lastTime=Math.max(lastTime,sub.creationTimeSeconds);
+  })
+  sum=Math.round(sum);
+  //lastTime=Math.max(ok.map(o=>o.creationTimeSeconds),startTime);
+  //return [0,0];
+  //console.log(sum,lastTime)
+  return [sum,lastTime-startTime];
+}
 
 
 
@@ -92,6 +141,15 @@ const others = all - (ac + wa + tle);
 return [ac, wa, tle, others];
 };
 
+const getCorrect=async (submissions,startTime,endTime) => {
+  //const all = await countSubmissions(submissions, "ALL",startTime,endTime);
+  const ac = await countSubmissions(submissions, "OK",startTime,endTime);
+  //const wa = await countSubmissions(submissions, "WRONG_ANSWER",startTime,endTime);
+  //const tle = await countSubmissions(submissions, "TIME_LIMIT_EXCEEDED",startTime,endTime);
+  //const others = all - (ac + wa + tle);
+  const getR=await countAvg(submissions,"OK",startTime,endTime)
+  return [ac, getR];
+  };
 
 
 
@@ -99,5 +157,7 @@ module.exports={
     UnixToDate,
     getDatasets,
     getMonthName,
-    getSub
+    getSub,
+    getCorrect,
+    getFinalPoints
 }
