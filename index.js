@@ -3,7 +3,7 @@ const Discord=require("discord.js");
 const client=new Discord.Client()
 const quickchart= require('quickchart-js')
 const {getRating, getUpcoming,getRatingGraph,getInformation,googleQues,getVirtualList,getPredProblemSet,getAC
-,getVirtualQues,getStatus,getPoints,getLastRatingChange,getContestName}=require('./api_calls/basic')
+,getVirtualQues,getStatus,getPoints,getLastRatingChange}=require('./api_calls/basic')
 const {UnixToDate}=require('./api_calls/util')
 const {execute,skip,destroy}=require('./api_calls/song')
 const {pred}=require('./api_calls/chatbot1')
@@ -812,6 +812,124 @@ client.on("message",async(msg)=>{
     }
 })
  
+//help
+client.on("message",async(msg)=>{
+    if(!msg.guild) return;
+    if(msg.author.bot) return;
+    if(!msg.content.startsWith("$")) return;
+    if(msg.content.startsWith("$help")){
+        let words=msg.content.split(",");
+        if(words[1]===""){
+            let msgg=new Discord.MessageEmbed()
+            .setColor('#0099ff')
+            .setTitle("Help Desk | Command-Info")
+            .setDescription(`The bot recognises only the following commands and all of them starts with "$".`)
+            .addField(`$set, - Used to link your cf_handle with your discord ID.`,`Use "$help,set" for more info regarding this. `)
+            .addField(`$hi, - Used to start a casual conversation with the bot!`,`Use "$help,hi" for more info regarding this. `)
+            .addField(`$bye, - Can only be used mid-conversation with the bot ($hi,) `,`If you dont get it by now, you wont. `)
+            .addField(`$rGraph, - Used to get Line graph of Rating Changes of any user on CF.`,`Use "$help,rGraph" for more info regarding this. `)
+            .addField(`$rating, - Used to get Current Rating of any user on CF.`,`Use "$help,rating" for more info regarding this. `)
+            .addField(`$upcoming, - Used to get a list of upcoming contest on CF`,`If you dont get it by now, you wont. `)
+            .addField(`$info, - Used to get public information of any user on CF.`,`Use "$help,info" for more info regarding this. `)
+            .addField(`$search, - Used to get top google searches for any question's solution or any search in general.`,`Use "$help,search" for more info regarding this. `)
+            .addField(`$status, - Used to get information regarding submissions of past 30 days of any user on CF`,`Use "$help,status" for more info regarding this. `)
+            .addField(`$lboard, - Used to get the leaderboard containing all registered users on the server. (based on CF stats)`,`Use "$help,lboard" for more info regarding this. `)
+            .addField(`$virtual, - Used to start a virtual contest for all registered users on the server.`,`Use "$help,virtual" for more info regarding this. `)
+            msg.channel.send(msgg);
+
+        }
+        else if(words[1]=="set"){
+            let msgg=new Discord.MessageEmbed()
+            .setColor('#0099ff')
+            .setTitle("Help :" +words[1])
+            .setDescription(`Normal Format: $set,{cf_username}-$set,mafailure` )
+            msg.channel.send(msgg);
+        }
+        else if(words[1]=="hi"){
+            let msgg=new Discord.MessageEmbed()
+            .setColor('#0099ff')
+            .setTitle("Help :" +words[1])
+            .setDescription(`The chat bot replies and helps you according to your mood.` )
+            msg.channel.send(msgg);
+        }
+        else if(words[1]=="rGraph"){
+            let msgg=new Discord.MessageEmbed()
+            .setColor('#0099ff')
+            .setTitle("Help :" +words[1])
+            .setDescription(`Normal Format: $`+words[1]+`,{cf_username}-$set,mafailure. \n "$`+words[1]+`," can be used if user wants to get their info. ` )
+            msg.channel.send(msgg);
+        }
+        else if(words[1]=="rating"){
+            let msgg=new Discord.MessageEmbed()
+            .setColor('#0099ff')
+            .setTitle("Help :" +words[1])
+            .setDescription(`Normal Format: $`+words[1]+`,{cf_username}-$set,mafailure. \n "$`+words[1]+`," can be used if user wants to get their info. ` )
+            msg.channel.send(msgg);
+        }
+        else if(words[1]=="info"){
+            let msgg=new Discord.MessageEmbed()
+            .setColor('#0099ff')
+            .setTitle("Help :" +words[1])
+            .setDescription(`Normal Format: $`+words[1]+`,{cf_username}-$set,mafailure. \n "$`+words[1]+`," can be used if user wants to get their info. ` )
+            msg.channel.send(msgg);
+        }
+        else if(words[1]=="status"){
+            let msgg=new Discord.MessageEmbed()
+            .setColor('#0099ff')
+            .setTitle("Help :" +words[1])
+            .setDescription(`Normal Format: $`+words[1]+`,{cf_username}-$set,mafailure. \n "$`+words[1]+`," can be used if user wants to get their info. ` )
+            msg.channel.send(msgg);
+        }
+        else if(words[1]=="search"){
+            let msgg=new Discord.MessageEmbed()
+            .setColor('#0099ff')
+            .setTitle("Help :" +words[1])
+            .setDescription(`Normal Format: $`+words[1]+`,{ques}-$set,what is codeforces?.` )
+            msg.channel.send(msgg);
+        }
+        else if(words[1]=="lboard"){
+            let msgg=new Discord.MessageEmbed()
+            .setColor('#0099ff')
+            .setTitle("Help :" +words[1])
+            .setDescription(`Normal Format: $`+words[1]+`,{R/P}. \n 
+            Use $lboard,R to get leaderboard according to rating, $lboard,P to get leaderboard according to number of problems solved successfully in the past month.` )
+            msg.channel.send(msgg);
+        }
+        else if(words[1]=="virtual"){
+            let msgg={
+                color: 0x0099ff,
+                title:'Rules/Info',
+                description:"The bot would only consider submissions of registered users only.",
+                fields:[{
+                    name:'1. The problems are calculated according to the average rating of the users participating.',
+                    value:' ^.^'
+                },
+            {
+                name:'2. The problems provided would be in the increasing order of rating and thus, each one having more points weightage than its previous.',
+                value:'^.^ '
+            },{
+                name:'3. Please do not submit solution of any other question in between the contest.',
+                value:'^.^ '
+            },
+            {
+                name:'4. A reminder would be provided 10 minutes before the Ending time of Contest.',
+                value:' ^.^'
+            },
+            {
+                name:'5. Late submission carries equal penalty for all problems.',
+                value:' ^.^'
+            },
+            {
+                name:'6. Use "$standings," to get current standings of all users . ',
+                value:' ^.^'
+            }
+        ]
+            }
+            msg.channel.send({embed:msgg})
+        }
+        
+    }
+})
 //for songs
 
 client.on("message",async(msg)=>{
