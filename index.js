@@ -1,7 +1,7 @@
-const http = require('http');
+const http = require("http");
 const server = http.createServer((req, res) => {
   res.writeHead(200);
-  res.end('ok');
+  res.end("ok");
 });
 server.listen(3000);
 require("dotenv").config();
@@ -35,7 +35,7 @@ let serverId, channelId;
 let chatnow = false;
 let userId = undefined;
 let users = new Map();
-let friends= [];
+let friends = [];
 let questions = [];
 var startTime;
 
@@ -80,17 +80,18 @@ client.on("ready", () => {
                     rank = "expert";
                   } else if (val.newRating >= 1400) {
                     rank = "specialist";
-                  } else {
+                  } else if (val.newRating >= 1200) {
                     rank = "pupil";
+                  } else {
+                    rank = "newbie";
                   }
                   //console.log(rank)
                   let list = client.guilds.cache.get(serverId);
-                  let role = list.roles.cache.find(
-                    (r) => r.name === "international master"
-                  );
+                  let role = list.roles.cache.find((r) => r.name === rank);
                   var color;
 
                   let rankarr = [
+                    "newbie",
                     "pupil",
                     "specialist",
                     "expert",
@@ -110,6 +111,8 @@ client.on("ready", () => {
                     color = "YELLOW";
                   } else if (rank === "international master") {
                     color = "ORANGE";
+                  } else if (rank === "newbie") {
+                    color = "GREY";
                   } else {
                     color = "RED";
                   }
@@ -127,9 +130,7 @@ client.on("ready", () => {
                         let roles = list.roles.cache.find(
                           (r) => r.name === info.rank
                         );
-                        roles
-                          .setHoist(true)
-                          .catch(console.error);
+                        roles.setHoist(true).catch(console.error);
                         rankarr.forEach((element) => {
                           let role1 = list.roles.cache.find(
                             (r) => r.name === element
@@ -181,7 +182,7 @@ client.on("ready", () => {
                     .addField("Old Rating: ", info.rating)
                     .addField("New Rating: ", val.newRating)
                     .addField("Updated Rank: ", rank);
-                    lastRating.set(member.user.id, val);
+                  lastRating.set(member.user.id, val);
                   client.channels.cache.get(`${channelId}`).send(myEmbed);
                   client.users.cache.get(`${member.user.id}`).send(myEmbed);
                 }
@@ -217,7 +218,7 @@ client.on("message", async (msg) => {
     await getLastRatingChange(words[1]).then((val) => {
       lastRating.set(msg.author.id, val);
     });
-    let arr=[]
+    let arr = [];
     //friends.set(msg.author.id,arr);
     await getInformation(words[1]).then((info) => {
       users.set(msg.author.id, info);
@@ -226,7 +227,9 @@ client.on("message", async (msg) => {
       let list = client.guilds.cache.get(serverId);
       let role = list.roles.cache.find((r) => r.name === info.rank);
       var color;
+
       let rank = [
+        "newbie",
         "pupil",
         "specialist",
         "expert",
@@ -246,9 +249,12 @@ client.on("message", async (msg) => {
         color = "YELLOW";
       } else if (info.rank === "international master") {
         color = "ORANGE";
+      } else if (info.rank === "newbie") {
+        color = "GREY";
       } else {
         color = "RED";
       }
+
       if (!role) {
         list.roles
           .create({
@@ -357,14 +363,14 @@ client.on("message", async (msg) => {
   }
   if (!msg.content.startsWith("$")) return;
   if (msg.content.startsWith("$hi")) {
-    if(chatnow && msg.author.id!=userId){
+    if (chatnow && msg.author.id != userId) {
       msg.react(`🇩`);
-    msg.react(`🇺`);
-    msg.react(`🇲`);
-    msg.react(`🇧`);
-    msg.react("😡");
-    msg.reply("Are you blind? Cant you see I am having a conversation");
-    return;
+      msg.react(`🇺`);
+      msg.react(`🇲`);
+      msg.react(`🇧`);
+      msg.react("😡");
+      msg.reply("Are you blind? Cant you see I am having a conversation");
+      return;
     }
     if (!ids.get(msg.author.id)) {
       msg.channel.send(
@@ -413,16 +419,23 @@ client.on("message", async (msg) => {
       msg.reply("Are you blind? Can't you see I am having a conversation");
       return;
     }
+    let info = users.get(msg.author.id);
+    let url1 =
+      "https://codepred.herokuapp.com/api/prediction/data?handle=" +
+      info.handle;
+
     let words = msg.content.split(",");
-    let rating = users.get(msg.author.id).rating,
-      topic = words[1];
-      let info=users.get(msg.author.id)
-      let url="https://codepred.herokuapp.com/api/prediction/data?handle="+info.handle;
-      await fetch(url).then((res)=>res.json()).then((data)=>{
+    // let rating = users.get(msg.author.id).rating,
+    topic = words[1];
+    let rating;
+    await fetch(url1)
+      .then((val) => val.json())
+      .then((val) => {
+        console.log(val);
+        rating = val.data[topic];
+      });
 
-      })
-
-    getPredProblemSet(rating, msg, topic).then(async (res) => {
+    await getPredProblemSet(rating, msg, topic).then(async (res) => {
       msg.channel.send(
         "Here are some recommended question to strengthen " + topic
       );
@@ -436,15 +449,14 @@ client.on("message", async (msg) => {
           p.index;
         temp.push({
           name: p.name,
-          value:
-            "Submission Count: " + p.scnt + "  |  " + ` [Link](${link})  `,
+          value: "Submission Count: " + p.scnt + "  |  " + ` [Link](${link})  `,
           inline: false,
         });
         return p;
       });
-      rating/=100;
-      rating=Math.round(rating);
-      rating*=100;
+      rating /= 100;
+      rating = Math.round(rating);
+      rating *= 100;
       let msgg = {
         color: 0x0099ff,
         title: "Rating " + (rating + 100) + " :",
@@ -461,8 +473,7 @@ client.on("message", async (msg) => {
           p.index;
         temp.push({
           name: p.name,
-          value:
-            "Submission Count: " + p.scnt + "  |  " + ` [Link](${link})  `,
+          value: "Submission Count: " + p.scnt + "  |  " + ` [Link](${link})  `,
           inline: false,
         });
         return p;
@@ -483,8 +494,7 @@ client.on("message", async (msg) => {
           p.index;
         temp.push({
           name: p.name,
-          value:
-            "Submission Count: " + p.scnt + "  |  " + ` [Link](${link})  `,
+          value: "Submission Count: " + p.scnt + "  |  " + ` [Link](${link})  `,
           inline: false,
         });
         return p;
@@ -495,7 +505,7 @@ client.on("message", async (msg) => {
         fields: temp,
       };
       msg.channel.send({ embed: msgg });
-      msg.channel.send("Good-Bye, hope I could be of help!")
+      msg.channel.send("Good-Bye, hope I could be of help!");
     });
   }
 });
@@ -587,28 +597,30 @@ client.on("message", (msg) => {
       }
       cf_username = ids.get(msg.author.id);
       let info = users.get(msg.author.id);
-      let rating=info.rating;
-            let myEmbed= new Discord.MessageEmbed()
-            
-            .setColor('#0099ff')
-            .setDescription(`Rating for <@${msg.author.id}> is ${rating}. GG <3 `)
-            
-            msg.channel.send(myEmbed)
-            return;
+      let rating = info.rating;
+      let myEmbed = new Discord.MessageEmbed()
+
+        .setColor("#0099ff")
+        .setDescription(`Rating for <@${msg.author.id}> is ${rating}. GG <3 `);
+
+      msg.channel.send(myEmbed);
+      return;
     }
     getRating(cf_username)
       .then((val) => {
         let msgg = "";
         let arr = val.result;
         let latest = arr[arr.length - 1];
-       var rating = latest.newRating;
-            let myEmbed= new Discord.MessageEmbed()
-            
-            .setColor('#0099ff')
-            .setDescription(`Rating for <@${msg.author.id}> is ${rating}. GG <3 `)
-            
-            msg.channel.send(myEmbed)
-            return;
+        var rating = latest.newRating;
+        let myEmbed = new Discord.MessageEmbed()
+
+          .setColor("#0099ff")
+          .setDescription(
+            `Rating for <@${msg.author.id}> is ${rating}. GG <3 `
+          );
+
+        msg.channel.send(myEmbed);
+        return;
       })
       .catch((err) => {
         msg.channel.send("Send valid username!");
@@ -658,31 +670,34 @@ client.on("message", (msg) => {
       }
       cf_username = ids.get(msg.author.id);
       let val = users.get(msg.author.id);
-      let myEmbed= new Discord.MessageEmbed()
-            
-            .setColor('#0099ff')
-            .setDescription(`Codeforces name for<@${msg.author.id}> is ${val.firstName} ${val.lastName} `)
-            .addField('Country: ',val.country,)
-            .addField('Rank: ',val.rank,)
-            .setImage(val.titlePhoto)
-            msg.channel.send(myEmbed)
-            
-            return;
+      let myEmbed = new Discord.MessageEmbed()
+
+        .setColor("#0099ff")
+        .setDescription(
+          `Codeforces name for<@${msg.author.id}> is ${val.firstName} ${val.lastName} `
+        )
+        .addField("Country: ", val.country)
+        .addField("Rank: ", val.rank)
+        .setImage(val.titlePhoto);
+      msg.channel.send(myEmbed);
+
+      return;
     }
     getInformation(cf_username)
       .then((val) => {
-       let myEmbed= new Discord.MessageEmbed()
-            
-            .setColor('#0099ff')
-            .setDescription(`Codeforces name for @${val.handle} is ${val.firstName} ${val.lastName} `)
-            .addField('Country: ',val.country,)
-            .addField('Organisation: ',val.organization)
-            .addField('Rank: ',val.rank,)
-            .setImage(val.titlePhoto)
-            msg.channel.send(myEmbed)
-            
-            
-            return;
+        let myEmbed = new Discord.MessageEmbed()
+
+          .setColor("#0099ff")
+          .setDescription(
+            `Codeforces name for @${val.handle} is ${val.firstName} ${val.lastName} `
+          )
+          .addField("Country: ", val.country)
+          .addField("Organisation: ", val.organization)
+          .addField("Rank: ", val.rank)
+          .setImage(val.titlePhoto);
+        msg.channel.send(myEmbed);
+
+        return;
       })
       .catch((err) => {
         console.log(err);
@@ -694,19 +709,21 @@ client.on("message", (msg) => {
     googleQues(msg.content.substr(8) + " solution")
       .then((val) => {
         //console.log(val)
-        
+
         val = val.slice(0, 3);
-        let temp=[]
+        let temp = [];
         val.forEach((result, idx) => {
-          temp.push({name:(idx+1)+": " + result.title,value:`[Link](${result.link})`})
-          
+          temp.push({
+            name: idx + 1 + ": " + result.title,
+            value: `[Link](${result.link})`,
+          });
         });
         let msgg = {
-        color: 0x0099ff,
-        title: "Top Google searches: ",
-        fields: temp,
-      };
-      msg.channel.send({ embed: msgg });
+          color: 0x0099ff,
+          title: "Top Google searches: ",
+          fields: temp,
+        };
+        msg.channel.send({ embed: msgg });
       })
       .catch((err) => {
         console.log(err);
@@ -716,118 +733,124 @@ client.on("message", (msg) => {
     msg.content.startsWith("$Status") ||
     msg.content.startsWith("$status")
   ) {
-    let words=msg.content.split(',');
-        let cf_username=words[1];
-        if(cf_username==""){ 
-            if(!ids.get(msg.author.id)){
-                msg.channel.send('Please set your cf handle using "$set,{your_id} and then try again.\n ');
-                chatnow=false;
-                userId=undefined;
-                return;
-            }
-            cf_username=ids.get(msg.author.id);
-           // let val=users.get(msg.author.id);
-            
+    let words = msg.content.split(",");
+    let cf_username = words[1];
+    if (cf_username == "") {
+      if (!ids.get(msg.author.id)) {
+        msg.channel.send(
+          'Please set your cf handle using "$set,{your_id} and then try again.\n '
+        );
+        chatnow = false;
+        userId = undefined;
+        return;
+      }
+      cf_username = ids.get(msg.author.id);
+      // let val=users.get(msg.author.id);
 
-            getStatus(cf_username).then(async(val)=>{
-                
-                const chart= new quickchart();
-                console.log(val);
-                chart.setConfig({
-                    type:'doughnut',
-                    data:{
-                        labels:["AC","WA","TLE","Others"],
-                        datasets:[
-                            {
-                                label:"Submissions Statistics",
-                                data: val,
-                                
-                                backgroundColor:[
-                                    "rgba(75, 192, 192, 1)",
-                                    "rgba(255, 99, 132, 1)",
-                                    "rgba(54, 162, 235, 1)",
-                                    "rgba(255, 206, 86, 1)"
-                                ]
-                            }
-                        ]
-                    },
-                    options : {
-                        legend:{
-                            position: "bottom"
-                        },
-                        weight: 4
-                      }
-                })
-                .setWidth(800)
-                .setHeight(400);
-                //making chart according to chart.js
-                
-                //convertint to json so that quickchart which uses this json to convert chart into pic
-                const chartUrl = await chart.getShortUrl();
-                //console.log(chartUrl)
-                const chartEmbed = {
-                    title: words[1],
-                    description: `Submission Stats for ${cf_username}`,
-                    image: {
-                      url: chartUrl,
-                    },
-                  };
-                   msg.channel.send({ embed: chartEmbed });
-            }).catch((err)=>{
-                msg.channel.send('Send valid username!')
-             })
-            
-            return;
-        }
+      getStatus(cf_username)
+        .then(async (val) => {
+          const chart = new quickchart();
+          console.log(val);
+          chart
+            .setConfig({
+              type: "doughnut",
+              data: {
+                labels: ["AC", "WA", "TLE", "Others"],
+                datasets: [
+                  {
+                    label: "Submissions Statistics",
+                    data: val,
 
-        getStatus(words[1]).then(async(val)=>{
-            let msgg="";
-            //console.log(val.datasets)
-            const chart= new quickchart();
-           // console.log(val);
-            chart.setConfig({
-                type:'doughnut',
-                data:{
-                    labels:["AC","WA","TLE","Others"],
-                    datasets:[
-                        {
-                            label:"Submissions Statistics",
-                            data: val,
-                            
-                            backgroundColor:[
-                                "rgba(75, 192, 192, 1)",
-                                "rgba(255, 99, 132, 1)",
-                                "rgba(54, 162, 235, 1)",
-                                "rgba(255, 206, 86, 1)"
-                            ]
-                        }
-                    ]
+                    backgroundColor: [
+                      "rgba(75, 192, 192, 1)",
+                      "rgba(255, 99, 132, 1)",
+                      "rgba(54, 162, 235, 1)",
+                      "rgba(255, 206, 86, 1)",
+                    ],
+                  },
+                ],
+              },
+              options: {
+                legend: {
+                  position: "bottom",
                 },
-                options : {
-                    legend:{
-                        position: "bottom"
-                    },
-                    weight: 4
-                  }
+                weight: 4,
+              },
             })
             .setWidth(800)
             .setHeight(400);
-            //making chart according to chart.js
-            
-            //convertint to json so that quickchart which uses this json to convert chart into pic
-            const chartUrl = await chart.getShortUrl();
-            //console.log(chartUrl)
-            const chartEmbed = {
-                title: words[1],
-                description: 'Submission Stats',
-                image: {
-                  url: chartUrl,
+          //making chart according to chart.js
+
+          //convertint to json so that quickchart which uses this json to convert chart into pic
+          const chartUrl = await chart.getShortUrl();
+          //console.log(chartUrl)
+          const chartEmbed = {
+            title: words[1],
+            description: `Submission Stats for ${cf_username}`,
+            image: {
+              url: chartUrl,
+            },
+          };
+          msg.channel.send({ embed: chartEmbed });
+        })
+        .catch((err) => {
+          msg.channel.send("Send valid username!");
+        });
+
+      return;
+    }
+
+    getStatus(words[1])
+      .then(async (val) => {
+        let msgg = "";
+        //console.log(val.datasets)
+        const chart = new quickchart();
+        // console.log(val);
+        chart
+          .setConfig({
+            type: "doughnut",
+            data: {
+              labels: ["AC", "WA", "TLE", "Others"],
+              datasets: [
+                {
+                  label: "Submissions Statistics",
+                  data: val,
+
+                  backgroundColor: [
+                    "rgba(75, 192, 192, 1)",
+                    "rgba(255, 99, 132, 1)",
+                    "rgba(54, 162, 235, 1)",
+                    "rgba(255, 206, 86, 1)",
+                  ],
                 },
-              };
-               msg.channel.send({ embed: chartEmbed });
-        }).catch((err)=>{
-            msg.channel.send('Send valid username!')
-         })
+              ],
+            },
+            options: {
+              legend: {
+                position: "bottom",
+              },
+              weight: 4,
+            },
+          })
+          .setWidth(800)
+          .setHeight(400);
+        //making chart according to chart.js
+
+        //convertint to json so that quickchart which uses this json to convert chart into pic
+        const chartUrl = await chart.getShortUrl();
+        //console.log(chartUrl)
+        const chartEmbed = {
+          title: words[1],
+          description: "Submission Stats",
+          image: {
+            url: chartUrl,
+          },
+        };
+        msg.channel.send({ embed: chartEmbed });
+      })
+      .catch((err) => {
+        msg.channel.send("Send valid username!");
+      });
   }
 });
 
@@ -843,7 +866,7 @@ client.on("message", async (msg) => {
       let temp = [];
       let list = client.guilds.cache.get(serverId);
       let arr = [];
-       list.members.cache.forEach((member) => {
+      list.members.cache.forEach((member) => {
         // console.log(member.user.id,member.user.username)
         if (users.get(member.user.id)) {
           let info = users.get(member.user.id);
@@ -853,29 +876,29 @@ client.on("message", async (msg) => {
             rating: info.rating,
             info: info,
           });
-        //  console.log(info)
+          //  console.log(info)
         }
       });
-      let arr2=[]
-      let traverse =await friends.map(async(friend)=>{
-        let info=await getInformation(friend.handle);
+      let arr2 = [];
+      let traverse = await friends.map(async (friend) => {
+        let info = await getInformation(friend.handle);
         arr.push({
-          username:"NULL",
-          rating:info.rating,
-          info:info,
-          friendOf:friend.friend
-        })
+          username: "NULL",
+          rating: info.rating,
+          info: info,
+          friendOf: friend.friend,
+        });
         return friend;
-      })
+      });
       //console.log(traverse)
-      Promise.all(traverse).then((nm)=>{
+      Promise.all(traverse).then((nm) => {
         arr.sort((a, b) => b.rating - a.rating);
         arr.forEach((me, idx) => {
           let link = "https://codeforces.com/profile/" + me.info.handle;
           //console.log(me.info)
-          if(me.username=="NULL"){
+          if (me.username == "NULL") {
             temp.push({
-              name: idx + 1 +`${me.info.handle}`,
+              name: idx + 1 + `${me.info.handle}`,
               value:
                 "Curr Rating: " +
                 me.rating +
@@ -883,7 +906,7 @@ client.on("message", async (msg) => {
                 me.info.maxRating +
                 `    |    Friend of <@${me.friendOf}>`,
             });
-            return;  
+            return;
           }
           temp.push({
             name: idx + 1 + `: ${me.username}`,
@@ -901,7 +924,7 @@ client.on("message", async (msg) => {
           fields: temp,
         };
         msg.channel.send({ embed: msgg });
-      })
+      });
     } else if (words[1] == "P") {
       let temp = [];
       let list = client.guilds.cache.get(serverId);
@@ -926,33 +949,33 @@ client.on("message", async (msg) => {
         // console.log(i)
       });
       //console.log(traverse)
-      Promise.all(traverse).then(async(nm) => {
-        let traverse2 =await friends.map(async(friend)=>{
-          let info=await getInformation(friend.handle);
+      Promise.all(traverse).then(async (nm) => {
+        let traverse2 = await friends.map(async (friend) => {
+          let info = await getInformation(friend.handle);
           val = await getAC(friend.handle);
           arr.push({
             username: "NULL",
             prob: val[0],
             avgRating: Math.round(val[1]),
             info: info,
-            friendOf:friend.friend
+            friendOf: friend.friend,
           });
           return friend;
-        })
-        Promise.all(traverse2).then((nm)=>{
+        });
+        Promise.all(traverse2).then((nm) => {
           arr.sort((a, b) => b.prob - a.prob);
           arr.forEach((me, idx) => {
-            if(me.username=="NULL"){
+            if (me.username == "NULL") {
               temp.push({
-                name: idx + 1 +`: ${me.info.handle}`,
+                name: idx + 1 + `: ${me.info.handle}`,
                 value:
-                "Prob Solved: " +
-                me.prob +
-                "    |   AvgRatingofProblem: " +
-                me.avgRating +
+                  "Prob Solved: " +
+                  me.prob +
+                  "    |   AvgRatingofProblem: " +
+                  me.avgRating +
                   `    |    Friend of <@${me.friendOf}>`,
               });
-              return;  
+              return;
             }
             let link = "https://codeforces.com/profile/" + me.info.handle;
             temp.push({
@@ -971,7 +994,7 @@ client.on("message", async (msg) => {
             fields: temp,
           };
           msg.channel.send({ embed: msgg });
-        })
+        });
       });
       //console.log(arr)
       //console.log("outside")
@@ -1041,7 +1064,7 @@ client.on("message", async (msg) => {
     };
     msg.channel.send({ embed: msgg });
     questions.length = 0;
-    
+
     await setTimeout(async () => {
       let sum = 0,
         cnt = 0;
@@ -1459,39 +1482,38 @@ client.on("message", async (msg) => {
   }
 });
 //invite link
-client.on("message",async(msg)=>{
-  if(!msg.guild) return;
+client.on("message", async (msg) => {
+  if (!msg.guild) return;
   if (msg.author.bot) return;
   if (!msg.content.startsWith("$")) return;
-  if(msg.content.startsWith("$invite")){
-    let msgg = new Discord.MessageEmbed()
-        .setColor("#0099ff")
-        .setDescription(
-          `Use this link to invite bot to any server.
+  if (msg.content.startsWith("$invite")) {
+    let msgg = new Discord.MessageEmbed().setColor("#0099ff").setDescription(
+      `Use this link to invite bot to any server.
           https://tiny.one/De-Codeforces`
-        );
-      msg.channel.send(msgg);
+    );
+    msg.channel.send(msgg);
   }
-})
+});
 
 //friends
 
-client.on("message",async(msg)=>{
-  if(!msg.guild) return;
+client.on("message", async (msg) => {
+  if (!msg.guild) return;
   if (msg.author.bot) return;
   if (!msg.content.startsWith("$")) return;
-  if(msg.content.startsWith("$friend")){
-    let words=msg.content.split(",");
-    let userId=msg.author.id;
-    let list=client.guilds.cache.get(serverId);
-    let present=false,friendOf;
-    friends.forEach((f)=>{
-      if(f.handle==words[1]){
-        present=true;
-        friendOf=f.friend;
+  if (msg.content.startsWith("$friend")) {
+    let words = msg.content.split(",");
+    let userId = msg.author.id;
+    let list = client.guilds.cache.get(serverId);
+    let present = false,
+      friendOf;
+    friends.forEach((f) => {
+      if (f.handle == words[1]) {
+        present = true;
+        friendOf = f.friend;
       }
-    })
-    if(present){
+    });
+    if (present) {
       let msgg = new Discord.MessageEmbed()
         .setColor("#0099ff")
         .setDescription(
@@ -1499,11 +1521,9 @@ client.on("message",async(msg)=>{
         );
       msg.channel.send(msgg);
       return;
-    }
-    else{
-      
-      friends.push({friend:msg.author.id,handle:words[1]});
-      let url="https://codeforces.com/profile/"+words[1];
+    } else {
+      friends.push({ friend: msg.author.id, handle: words[1] });
+      let url = "https://codeforces.com/profile/" + words[1];
       let msgg = new Discord.MessageEmbed()
         .setColor("#0099ff")
         .setDescription(
@@ -1512,55 +1532,55 @@ client.on("message",async(msg)=>{
       msg.channel.send(msgg);
     }
   }
-
-})
+});
 
 //remove friends
 
-client.on("message",async(msg)=>{
-  if(!msg.guild) return;
+client.on("message", async (msg) => {
+  if (!msg.guild) return;
   if (msg.author.bot) return;
   if (!msg.content.startsWith("$")) return;
-  if(msg.content.startsWith("$remove")){
-    let words=msg.content.split(",");
-    let ff,present=false;
-    let newarr=[]
-    friends.forEach((f)=>{
-      if(f.handle==words[1]){
-        ff=f;
-        present=true;
-      }else{
+  if (msg.content.startsWith("$remove")) {
+    let words = msg.content.split(",");
+    let ff,
+      present = false;
+    let newarr = [];
+    friends.forEach((f) => {
+      if (f.handle == words[1]) {
+        ff = f;
+        present = true;
+      } else {
         newarr.push(f);
       }
-    })
-    if(!present){
+    });
+    if (!present) {
       let msgg = new Discord.MessageEmbed()
         .setColor("#0099ff")
         .setDescription(
           `This cf_handle isnt friend of any user. Are you dreaming your imaginary friend again?`
         );
-        msg.channel.send(msgg);
-        return;
+      msg.channel.send(msgg);
+      return;
     }
-    friends=newarr;
-    if(ff.friend!=msg.author.id){
+    friends = newarr;
+    if (ff.friend != msg.author.id) {
       let msgg = new Discord.MessageEmbed()
         .setColor("#0099ff")
         .setDescription(
           `Please don't try to remove someone else's friends, you loner!`
         );
-        msg.channel.send(msgg);
-        return;
+      msg.channel.send(msgg);
+      return;
     }
     let msgg = new Discord.MessageEmbed()
-        .setColor("#0099ff")
-        .setDescription(
-          `${words[1]} successfully removed from your friend's list `
-        );
-        msg.channel.send(msgg);
-        return;
+      .setColor("#0099ff")
+      .setDescription(
+        `${words[1]} successfully removed from your friend's list `
+      );
+    msg.channel.send(msgg);
+    return;
   }
-})
+});
 
 //for songs
 
