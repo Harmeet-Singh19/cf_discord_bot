@@ -426,7 +426,7 @@ const getAC = async(username) =>{
       //  console.log(prevtimeStamp,timeStamp);
         //console.log(res)
         SubGraph= await (getCorrect(data.result,prevtimeStamp/1000,timeStamp/1000));
-        //console.log(SubGraph)
+       // console.log(SubGraph)
         
     })
     return new Promise( (resolve,reject)=>{

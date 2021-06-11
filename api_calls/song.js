@@ -2,7 +2,18 @@ const {getInfo,getURLVideoID,getVideoID}=require('ytdl-core')
 const ytdl = require("ytdl-core");
 
 var songs={
-    ["happy"]:['https://www.youtube.com/watch?v=zIC6tWwNyhk','https://www.youtube.com/watch?v=tt2k8PGm-TI']
+    ["happy"]:['https://youtu.be/ru0K8uYEZWw','https://www.youtube.com/watch?v=tt2k8PGm-TI','https://youtu.be/YykjpeuMNEk',
+    'https://youtu.be/d_HlPboLRL8',
+    'https://youtu.be/nfWlot6h_JM',
+    'https://youtu.be/09R8_2nJtjg',
+    'https://youtu.be/1G4isv_Fylg',
+    'https://youtu.be/IcrbM1l_BoI',
+    'https://youtu.be/qK_NeRZOdq4'],
+    ["lofi"]:['https://youtu.be/XDpoBc8t6gE','https://youtu.be/GgVcgbtHY9k','https://youtu.be/2VMSdwRCKaU',
+    'https://youtu.be/jJPMnTXl63E','https://youtu.be/rCFmLjGq3Jg','https://youtu.be/WTsmIbNku5g','https://youtu.be/qz7tCZE_3wA',
+    'https://youtu.be/1WGCADztYKs'],
+    ["indie"]:['https://youtu.be/2g5xkLqIElU','https://youtu.be/2SUwOgmvzK4','https://youtu.be/pFptt7Cargc','https://youtu.be/f3OQKhhKhsA','https://youtu.be/r_LFDK49I6s','https://youtu.be/Z9e7K6Hx_rY','https://youtu.be/DxvFdX2yOBI','https://youtu.be/fHBIj4BF5xc'],
+    ["rock"]:['https://youtu.be/zQ3PeDGswz4','https://youtu.be/XFkzRNyygfk','https://youtu.be/fHiGbolFFGw','https://youtu.be/hTWKbfoikeg','https://youtu.be/kXYiU_JCYtU','https://youtu.be/Soa3gO7tL-c','https://youtu.be/HyHNuVaZJ-k']
 }
 
 
