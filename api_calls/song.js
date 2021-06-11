@@ -13,7 +13,9 @@ var songs={
     'https://youtu.be/jJPMnTXl63E','https://youtu.be/rCFmLjGq3Jg','https://youtu.be/WTsmIbNku5g','https://youtu.be/qz7tCZE_3wA',
     'https://youtu.be/1WGCADztYKs'],
     ["indie"]:['https://youtu.be/2g5xkLqIElU','https://youtu.be/2SUwOgmvzK4','https://youtu.be/pFptt7Cargc','https://youtu.be/f3OQKhhKhsA','https://youtu.be/r_LFDK49I6s','https://youtu.be/Z9e7K6Hx_rY','https://youtu.be/DxvFdX2yOBI','https://youtu.be/fHBIj4BF5xc'],
-    ["rock"]:['https://youtu.be/zQ3PeDGswz4','https://youtu.be/XFkzRNyygfk','https://youtu.be/fHiGbolFFGw','https://youtu.be/hTWKbfoikeg','https://youtu.be/kXYiU_JCYtU','https://youtu.be/Soa3gO7tL-c','https://youtu.be/HyHNuVaZJ-k']
+    ["rock"]:['https://youtu.be/zQ3PeDGswz4','https://youtu.be/XFkzRNyygfk','https://youtu.be/fHiGbolFFGw','https://youtu.be/hTWKbfoikeg','https://youtu.be/kXYiU_JCYtU','https://youtu.be/Soa3gO7tL-c','https://youtu.be/HyHNuVaZJ-k'],
+    ["regular"]:['https://www.youtube.com/watch?v=Ax0G_P2dSBw','https://www.youtube.com/watch?v=BiVyN2ftrrs','https://www.youtube.com/watch?v=j5-yKhDd64s','https://www.youtube.com/watch?v=bnqLzCsffwY','https://www.youtube.com/watch?v=3gK_2XdjOdY','https://www.youtube.com/watch?v=7wtfhZwyrcc',
+'https://www.youtube.com/watch?v=7wtfhZwyrcc','https://www.youtube.com/watch?v=8DMF0U6xV78','https://www.youtube.com/watch?v=UtF6Jej8yb4']
 }
 
 

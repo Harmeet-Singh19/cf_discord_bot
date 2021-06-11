@@ -35,7 +35,7 @@ let serverId, channelId;
 let chatnow = false;
 let userId = undefined;
 let users = new Map();
-let friends= new Map();
+let friends= [];
 let questions = [];
 var startTime;
 
@@ -217,6 +217,8 @@ client.on("message", async (msg) => {
     await getLastRatingChange(words[1]).then((val) => {
       lastRating.set(msg.author.id, val);
     });
+    let arr=[]
+    //friends.set(msg.author.id,arr);
     await getInformation(words[1]).then((info) => {
       users.set(msg.author.id, info);
       let url = "https://codeforces.com/profile/" + words[1];
@@ -841,7 +843,7 @@ client.on("message", async (msg) => {
       let temp = [];
       let list = client.guilds.cache.get(serverId);
       let arr = [];
-      list.members.cache.forEach((member) => {
+       list.members.cache.forEach((member) => {
         // console.log(member.user.id,member.user.username)
         if (users.get(member.user.id)) {
           let info = users.get(member.user.id);
@@ -851,27 +853,55 @@ client.on("message", async (msg) => {
             rating: info.rating,
             info: info,
           });
+        //  console.log(info)
         }
       });
-      arr.sort((a, b) => b.rating - a.rating);
-      arr.forEach((me, idx) => {
-        let link = "https://codeforces.com/profile/" + me.info.handle;
-        temp.push({
-          name: idx + 1 + `: ${me.username}`,
-          value:
-            "Curr Rating: " +
-            me.rating +
-            "    |   MaxRating: " +
-            me.info.maxRating +
-            `    |    [${me.info.handle}](${link})`,
+      let arr2=[]
+      let traverse =await friends.map(async(friend)=>{
+        let info=await getInformation(friend.handle);
+        arr.push({
+          username:"NULL",
+          rating:info.rating,
+          info:info,
+          friendOf:friend.friend
+        })
+        return friend;
+      })
+      //console.log(traverse)
+      Promise.all(traverse).then((nm)=>{
+        arr.sort((a, b) => b.rating - a.rating);
+        arr.forEach((me, idx) => {
+          let link = "https://codeforces.com/profile/" + me.info.handle;
+          //console.log(me.info)
+          if(me.username=="NULL"){
+            temp.push({
+              name: idx + 1 +`${me.info.handle}`,
+              value:
+                "Curr Rating: " +
+                me.rating +
+                "    |   MaxRating: " +
+                me.info.maxRating +
+                `    |    Friend of <@${me.friendOf}>`,
+            });
+            return;  
+          }
+          temp.push({
+            name: idx + 1 + `: ${me.username}`,
+            value:
+              "Curr Rating: " +
+              me.rating +
+              "    |   MaxRating: " +
+              me.info.maxRating +
+              `    |    [${me.info.handle}](${link})`,
+          });
         });
-      });
-      let msgg = {
-        color: 0x0099ff,
-        title: "Leaderboard :",
-        fields: temp,
-      };
-      msg.channel.send({ embed: msgg });
+        let msgg = {
+          color: 0x0099ff,
+          title: "Leaderboard :",
+          fields: temp,
+        };
+        msg.channel.send({ embed: msgg });
+      })
     } else if (words[1] == "P") {
       let temp = [];
       let list = client.guilds.cache.get(serverId);
@@ -888,7 +918,7 @@ client.on("message", async (msg) => {
             username: member.user.tag,
             id: member.user.id,
             prob: val[0],
-            avgRating: val[1],
+            avgRating: Math.round(val[1]),
             info: info,
           });
         }
@@ -896,26 +926,52 @@ client.on("message", async (msg) => {
         // console.log(i)
       });
       //console.log(traverse)
-      Promise.all(traverse).then((nm) => {
-        arr.sort((a, b) => b.prob - a.prob);
-        arr.forEach((me, idx) => {
-          let link = "https://codeforces.com/profile/" + me.info.handle;
-          temp.push({
-            name: idx + 1 + `: ${me.username}`,
-            value:
-              "Prob Solved: " +
-              me.prob +
-              "    |   AvgRatingofProblem: " +
-              me.avgRating +
-              `    |    [${me.info.handle}](${link})`,
+      Promise.all(traverse).then(async(nm) => {
+        let traverse2 =await friends.map(async(friend)=>{
+          let info=await getInformation(friend.handle);
+          val = await getAC(friend.handle);
+          arr.push({
+            username: "NULL",
+            prob: val[0],
+            avgRating: Math.round(val[1]),
+            info: info,
+            friendOf:friend.friend
           });
-        });
-        let msgg = {
-          color: 0x0099ff,
-          title: "Leaderboard :",
-          fields: temp,
-        };
-        msg.channel.send({ embed: msgg });
+          return friend;
+        })
+        Promise.all(traverse2).then((nm)=>{
+          arr.sort((a, b) => b.prob - a.prob);
+          arr.forEach((me, idx) => {
+            if(me.username=="NULL"){
+              temp.push({
+                name: idx + 1 +`: ${me.info.handle}`,
+                value:
+                "Prob Solved: " +
+                me.prob +
+                "    |   AvgRatingofProblem: " +
+                me.avgRating +
+                  `    |    Friend of <@${me.friendOf}>`,
+              });
+              return;  
+            }
+            let link = "https://codeforces.com/profile/" + me.info.handle;
+            temp.push({
+              name: idx + 1 + `: ${me.username}`,
+              value:
+                "Prob Solved: " +
+                me.prob +
+                "    |   AvgRatingofProblem: " +
+                me.avgRating +
+                `    |    [${me.info.handle}](${link})`,
+            });
+          });
+          let msgg = {
+            color: 0x0099ff,
+            title: "Leaderboard :",
+            fields: temp,
+          };
+          msg.channel.send({ embed: msgg });
+        })
       });
       //console.log(arr)
       //console.log("outside")
@@ -1269,7 +1325,7 @@ client.on("message", async (msg) => {
           `If you dont get it by now, you wont. `
         )
         .addField(
-          `$invite, - Used to destroy the currently playing queue for songs(skip all).`,
+          `$invite, - Used to get invite link of the bot.`,
           `If you dont get it by now, you wont. `
         );
       msg.channel.send(msgg);
@@ -1412,7 +1468,7 @@ client.on("message",async(msg)=>{
         .setColor("#0099ff")
         .setDescription(
           `Use this link to invite bot to any server.
-          "https://tiny.one/De-Codeforces"`
+          https://tiny.one/De-Codeforces`
         );
       msg.channel.send(msgg);
   }
@@ -1427,40 +1483,83 @@ client.on("message",async(msg)=>{
   if(msg.content.startsWith("$friend")){
     let words=msg.content.split(",");
     let userId=msg.author.id;
-    let list=msg.guilds.cache.get(serverId);
+    let list=client.guilds.cache.get(serverId);
     let present=false,friendOf;
-    list.members.cache.forEach((member)=>{
-      let allFriends=friends.get(member.user.id);
-      allFriends.forEach((ele)=>{
-        if(ele==words[1]){
-          present=true;
-          friendOf=member.user.id
-        }
-      })
+    friends.forEach((f)=>{
+      if(f.handle==words[1]){
+        present=true;
+        friendOf=f.friend;
+      }
     })
     if(present){
       let msgg = new Discord.MessageEmbed()
         .setColor("#0099ff")
         .setDescription(
-          `This user is already added as a friend of <@${friendOf}>. Get new friends , loser`
+          `This user is already added as a friend of ${friendOf}. Get new friends , loser`
         );
       msg.channel.send(msgg);
       return;
     }
     else{
-      let arr=friends.get(userId);
-      arr.push(words[1])
-      friends.set(userId,arr);
-      let url=""
+      
+      friends.push({friend:msg.author.id,handle:words[1]});
+      let url="https://codeforces.com/profile/"+words[1];
       let msgg = new Discord.MessageEmbed()
         .setColor("#0099ff")
         .setDescription(
-          `[${words[1]}]`
+          `[${words[1]}](${url}) added as a friend of <@${userId}>`
         );
       msg.channel.send(msgg);
     }
   }
 
+})
+
+//remove friends
+
+client.on("message",async(msg)=>{
+  if(!msg.guild) return;
+  if (msg.author.bot) return;
+  if (!msg.content.startsWith("$")) return;
+  if(msg.content.startsWith("$remove")){
+    let words=msg.content.split(",");
+    let ff,present=false;
+    let newarr=[]
+    friends.forEach((f)=>{
+      if(f.handle==words[1]){
+        ff=f;
+        present=true;
+      }else{
+        newarr.push(f);
+      }
+    })
+    if(!present){
+      let msgg = new Discord.MessageEmbed()
+        .setColor("#0099ff")
+        .setDescription(
+          `This cf_handle isnt friend of any user. Are you dreaming your imaginary friend again?`
+        );
+        msg.channel.send(msgg);
+        return;
+    }
+    friends=newarr;
+    if(ff.friend!=msg.author.id){
+      let msgg = new Discord.MessageEmbed()
+        .setColor("#0099ff")
+        .setDescription(
+          `Please don't try to remove someone else's friends, you loner!`
+        );
+        msg.channel.send(msgg);
+        return;
+    }
+    let msgg = new Discord.MessageEmbed()
+        .setColor("#0099ff")
+        .setDescription(
+          `${words[1]} successfully removed from your friend's list `
+        );
+        msg.channel.send(msgg);
+        return;
+  }
 })
 
 //for songs
