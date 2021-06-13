@@ -1,4 +1,5 @@
 const http = require("http");
+const fetch= require('node-fetch')
 const server = http.createServer((req, res) => {
   res.writeHead(200);
   res.end("ok");
@@ -6,8 +7,10 @@ const server = http.createServer((req, res) => {
 server.listen(3000);
 require("dotenv").config();
 const Discord = require("discord.js");
+const EasyEmbedPages = require('easy-embed-pages');
 const client = new Discord.Client();
 const quickchart = require("quickchart-js");
+const fs= require("fs")
 const {
   getRating,
   getUpcoming,
@@ -25,25 +28,32 @@ const {
 const { UnixToDate } = require("./api_calls/util");
 const { execute, skip, destroy } = require("./api_calls/song");
 const { pred } = require("./api_calls/chatbot1");
-client.login(process.env.BOT_ID);
-
-const lastRating = new Map();
-const queue = new Map();
-const ids = new Map();
+client.login(process.env.BOT_ID).then().catch((err)=>
+console.log(err));
+client.on('debug', console.log);
+//const Database = require("@replit/database")
+const store= require('data-store')({  path: '/locadb.json' })
+// const lastRating = new Map();
+ const queue = new Map();
+// const ids = new Map();
+//const Keyv = new Database()
+const Keyv= store
 let serverId, channelId;
 
 let chatnow = false;
 let userId = undefined;
-let users = new Map();
-let friends = [];
+// let users = new Map();
+// let friends = [];
 let questions = [];
 var startTime;
 
 client.on("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
-  client.user.setActivity(" $help, ", {
-    type: "LISTENING",
-  });
+  setInterval(()=>{
+    client.user.setActivity(" $help ", {
+        type: "LISTENING",
+      });
+  },5000)
   setTimeout(async () => {
     //sendMessage(); // send the message once
 
@@ -53,10 +63,14 @@ client.on("ready", () => {
       //  sendMessage();
       //console.log(serverId)
       if (serverId) {
+        if(!await Keyv.get(serverId+"friends") ){
+        //  console.log("why")
+          await Keyv.set(serverId+"friends",[]);
+        }
         let list = client.guilds.cache.get(serverId);
         let channel = client.channels.cache.get(`${channelId}`);
         var traverse = await list.members.cache.map(async (member) => {
-          let info = users.get(member.user.id);
+          let info = await Keyv.get(member.user.id+"userinfo");
           //console.log(info)
           if (info) {
             await getLastRatingChange(info.handle)
@@ -64,7 +78,7 @@ client.on("ready", () => {
                 // console.log(channel,"dd")
                 //console.log(lastRating.get(member.user.id),val)
                 if (
-                  lastRating.get(member.user.id).ratingUpdateTimeSeconds !=
+                  await Keyv.get(member.user.id+"lastRating").ratingUpdateTimeSeconds !=
                   val.ratingUpdateTimeSeconds
                 ) {
                   //console.log(val,"val")
@@ -212,16 +226,32 @@ client.on("message", async (msg) => {
   channelId = msg.channel.id;
   if (msg.author.bot) return;
   if (!msg.content.startsWith("$")) return;
-  if (msg.content.startsWith("$set")) {
+  if(msg.content.trim()=="$set"){
+    return;
+  }
+  else if (msg.content.startsWith("$set")) {
     let words = msg.content.split(",");
-    ids.set(msg.author.id, words[1]);
-    await getLastRatingChange(words[1]).then((val) => {
-      lastRating.set(msg.author.id, val);
-    });
+    if(words.length!=2){
+      msg.channel.send("Send valid username");
+      return;
+    }
+    words[1]=words[1].trim();
+    if(words[1]==""){
+      msg.channel.send("Send valid username");
+      return;
+    }
+    
     let arr = [];
     //friends.set(msg.author.id,arr);
-    await getInformation(words[1]).then((info) => {
-      users.set(msg.author.id, info);
+    await getInformation(words[1]).then(async(info) => {
+      await Keyv.set(msg.author.id+"ids", words[1]);
+      await getLastRatingChange(words[1]).then(async(val) => {
+        await Keyv.set(msg.author.id+"lastRating", val);
+      }).catch((err)=>{
+        msg.channel.send("Send valid username");
+        return;
+      });
+      await Keyv.set(msg.author.id+"userInfo", info);
       let url = "https://codeforces.com/profile/" + words[1];
       let cf = words[1];
       let list = client.guilds.cache.get(serverId);
@@ -286,7 +316,7 @@ client.on("message", async (msg) => {
                 `CF handle for <@${msg.author.id}> registered.    [${cf}](${url})`
               )
               .addField("MaxRating: ", info.maxRating)
-              .addField("Last Online: ", UnixToDate(info.lastOnlineTimeSeconds))
+              .addField("Last Online: ", UnixToDate(info.lastOnlineTimeSeconds+5*60*60+30*60))
               .addField("Role added: ", info.rank);
             msg.channel.send(myEmbed);
           })
@@ -313,6 +343,10 @@ client.on("message", async (msg) => {
         .addField("Last Online: ", UnixToDate(info.lastOnlineTimeSeconds))
         .addField("Role added: ", info.rank);
       msg.channel.send(myEmbed);
+    })
+    .catch((err)=>{
+      msg.channel.send("Send valid username");
+      return;
     });
   }
 });
@@ -342,12 +376,12 @@ client.on("message", async (msg) => {
     if (mood == "good") {
       //chat.push("2a");
       msg.channel.send(
-        "If you are interested in giving virtual contest, please reply with '$Yes, else with $bye"
+        "If you are interested in giving virtual contest, please reply with '$Yes' else with $bye"
       );
       chatnow = false;
     } else {
       msg.channel.send(
-        "Do you want help with any topic?, If yes, reply $TYes,{topic_name} else with $bye"
+        "Do you want help with any topic?, If yes, reply '$TYes,{topic_name}' else with $bye"
       );
       chatnow = false;
     }
@@ -396,7 +430,7 @@ client.on("message", async (msg) => {
     let words = msg.content.split(",");
     let cf_username = words[1];
     if (cf_username == "") {
-      if (!ids.get(msg.author.id)) {
+      if (!await Keyv.get(msg.author.id+"ids")) {
         msg.channel.send(
           'Please set your cf handle using "$set,{your_id} and then try again.\n '
         );
@@ -404,7 +438,7 @@ client.on("message", async (msg) => {
         userId = undefined;
         return;
       }
-      cf_username = ids.get(msg.author.id);
+      cf_username = await Keyv.get(msg.author.id+"ids");
     }
     getVirtualList(cf_username, msg).then((res) => {});
     chatnow = false;
@@ -419,23 +453,33 @@ client.on("message", async (msg) => {
       msg.reply("Are you blind? Can't you see I am having a conversation");
       return;
     }
-    let info = users.get(msg.author.id);
+    let info = await Keyv.get(msg.author.id+"userInfo");
     let url1 =
       "https://codepred.herokuapp.com/api/prediction/data?handle=" +
       info.handle;
 
     let words = msg.content.split(",");
     // let rating = users.get(msg.author.id).rating,
-    topic = words[1];
+    topic = words[1].trim();
     let rating;
     await fetch(url1)
       .then((val) => val.json())
       .then((val) => {
-        console.log(val);
+        //console.log(val);
         rating = val.data[topic];
-      });
+      }).catch(()=>{
+        msg.channel.send("Send valid topic");
+        chatnow = false;
+        userId = undefined;
+      })
 
     await getPredProblemSet(rating, msg, topic).then(async (res) => {
+      if(!res.high.length){
+        msg.channel.send("Send valid topic");
+        chatnow = false;
+        userId = undefined;
+        return;
+      }
       msg.channel.send(
         "Here are some recommended question to strengthen " + topic
       );
@@ -506,21 +550,31 @@ client.on("message", async (msg) => {
       };
       msg.channel.send({ embed: msgg });
       msg.channel.send("Good-Bye, hope I could be of help!");
+      chatnow = false;
+        userId = undefined;
     });
   }
 });
 
 //Rating, Rating graph, Pie Chart, info, google search basic funcs,
-client.on("message", (msg) => {
+client.on("message", async(msg) => {
   if (!msg.guild) return;
   if (msg.author.bot) return;
   if (!msg.content.startsWith("$")) return;
   //to get the rating graph
-  if (msg.content.startsWith("$rGraph")) {
+  if(msg.content=="rGraph" || msg.content=="rating" || msg.content=="info" || msg.content=="status" || msg.content=="search" ){
+    return;
+  }
+  else if (msg.content.startsWith("$rGraph")) {
     let words = msg.content.split(",");
-    let cf_username = words[1];
+    if(words.length!=2){
+      msg.channel.send("Send valid username");
+      return;
+    }
+     words[1]=words[1].trim();
+    let cf_username = words[1].trim();
     if (cf_username == "") {
-      if (!ids.get(msg.author.id)) {
+      if (!await Keyv.get(msg.author.id+"ids")) {
         msg.channel.send(
           'Please set your cf handle using "$set,{your_id} and then try again.\n '
         );
@@ -528,9 +582,9 @@ client.on("message", (msg) => {
         userId = undefined;
         return;
       }
-      cf_username = ids.get(msg.author.id);
+      cf_username = await Keyv.get(msg.author.id+"ids");
     }
-    getRatingGraph(cf_username)
+    await getRatingGraph(cf_username)
       .then(async (val) => {
         let msgg = "";
 
@@ -585,9 +639,14 @@ client.on("message", (msg) => {
   //to get only rating
   else if (msg.content.startsWith("$rating")) {
     let words = msg.content.split(",");
-    let cf_username = words[1];
-    if (cf_username == "") {
-      if (!ids.get(msg.author.id)) {
+    if(words.length!=2){
+      msg.channel.send("Send valid username");
+      return;
+    }
+     words[1]=words[1].trim();
+    let cf_username = words[1].trim();
+    if (cf_username == ""|| words.length!=2) {
+      if (!await Keyv.get(msg.author.id +"ids")) {
         msg.channel.send(
           'Please set your cf handle using "$set,{your_id} and then try again.\n '
         );
@@ -595,8 +654,8 @@ client.on("message", (msg) => {
         userId = undefined;
         return;
       }
-      cf_username = ids.get(msg.author.id);
-      let info = users.get(msg.author.id);
+      cf_username = await Keyv.get(msg.author.id +"ids");
+      let info = await Keyv.get(msg.author.id+"userInfo");
       let rating = info.rating;
       let myEmbed = new Discord.MessageEmbed()
 
@@ -606,7 +665,7 @@ client.on("message", (msg) => {
       msg.channel.send(myEmbed);
       return;
     }
-    getRating(cf_username)
+    await getRating(cf_username)
       .then((val) => {
         let msgg = "";
         let arr = val.result;
@@ -627,7 +686,7 @@ client.on("message", (msg) => {
       });
   }
   //to get upcoming scheduled cf contests
-  else if (msg.content.startsWith("$upcoming")) {
+  else if (msg.content=="$upcoming") {
     channelId = msg.channel.id;
     getUpcoming().then((arr) => {
       arr.reverse();
@@ -638,7 +697,7 @@ client.on("message", (msg) => {
           name: val.name,
           value:
             "Date: " +
-            UnixToDate(val.startTimeSeconds) +
+            UnixToDate(val.startTimeSeconds+5*60*60+1*30*60) +
             "  |  " +
             `[Link](${link})`,
           inline: false,
@@ -653,14 +712,22 @@ client.on("message", (msg) => {
         fields: temp,
       };
       msg.channel.send({ embed: msgg });
+    })
+    .catch((err)=>{
+      msg.channel.send(err);
     });
   }
   //toget info, profile pic rank rating country
   else if (msg.content.startsWith("$info")) {
     let words = msg.content.split(",");
-    let cf_username = words[1];
-    if (cf_username == "") {
-      if (!ids.get(msg.author.id)) {
+    if(words.length!=2){
+      msg.channel.send("Send valid username");
+      return;
+    }
+     words[1]=words[1].trim();
+    let cf_username = words[1].trim();
+    if (cf_username == ""|| words.length!=2) {
+      if (!await Keyv.get(msg.author.id+"ids")) {
         msg.channel.send(
           'Please set your cf handle using "$set,{your_id} and then try again.\n '
         );
@@ -668,8 +735,8 @@ client.on("message", (msg) => {
         userId = undefined;
         return;
       }
-      cf_username = ids.get(msg.author.id);
-      let val = users.get(msg.author.id);
+      cf_username = await Keyv.get(msg.author.id+"ids");
+      let val = await Keyv.get(msg.author.id+"userInfo");
       let myEmbed = new Discord.MessageEmbed()
 
         .setColor("#0099ff")
@@ -730,13 +797,17 @@ client.on("message", (msg) => {
         msg.channel.send("Error");
       });
   } else if (
-    msg.content.startsWith("$Status") ||
     msg.content.startsWith("$status")
   ) {
     let words = msg.content.split(",");
-    let cf_username = words[1];
-    if (cf_username == "") {
-      if (!ids.get(msg.author.id)) {
+    if(words.length!=2){
+      msg.channel.send("Send valid username");
+      return;
+    }
+     words[1]=words[1].trim();
+    let cf_username = words[1].trim();
+    if (cf_username == ""|| words.length!=2) {
+      if (!await Keyv.get(msg.author.id+"ids")) {
         msg.channel.send(
           'Please set your cf handle using "$set,{your_id} and then try again.\n '
         );
@@ -744,13 +815,13 @@ client.on("message", (msg) => {
         userId = undefined;
         return;
       }
-      cf_username = ids.get(msg.author.id);
+      cf_username = await Keyv.get(msg.author.id+"ids");
       // let val=users.get(msg.author.id);
 
       getStatus(cf_username)
         .then(async (val) => {
           const chart = new quickchart();
-          console.log(val);
+          //console.log(val);
           chart
             .setConfig({
               type: "doughnut",
@@ -794,7 +865,7 @@ client.on("message", (msg) => {
           msg.channel.send({ embed: chartEmbed });
         })
         .catch((err) => {
-          msg.channel.send("Send valid username!");
+          msg.channel.send("An unknown error occured");
         });
 
       return;
@@ -849,7 +920,7 @@ client.on("message", (msg) => {
         msg.channel.send({ embed: chartEmbed });
       })
       .catch((err) => {
-        msg.channel.send("Send valid username!");
+        msg.channel.send("An unknown error occured");
       });
   }
 });
@@ -860,16 +931,15 @@ client.on("message", async (msg) => {
   if (!msg.guild) return;
   if (msg.author.bot) return;
   if (!msg.content.startsWith("$")) return;
-  if (msg.content.startsWith("$lboard")) {
-    let words = msg.content.split(",");
-    if (words[1] == "R") {
-      let temp = [];
+  if (msg.content==("$boardR")) {
+   // let words = msg.content.split(",");
+    let temp = [];
       let list = client.guilds.cache.get(serverId);
       let arr = [];
-      list.members.cache.forEach((member) => {
+      let traverse2=await list.members.cache.map(async(member) => {
         // console.log(member.user.id,member.user.username)
-        if (users.get(member.user.id)) {
-          let info = users.get(member.user.id);
+        if (await Keyv.get(member.user.id+"userInfo")) {
+          let info = await Keyv.get(member.user.id+"userInfo");
           arr.push({
             username: member.user.tag,
             id: member.user.id,
@@ -879,54 +949,63 @@ client.on("message", async (msg) => {
           //  console.log(info)
         }
       });
-      let arr2 = [];
-      let traverse = await friends.map(async (friend) => {
-        let info = await getInformation(friend.handle);
-        arr.push({
-          username: "NULL",
-          rating: info.rating,
-          info: info,
-          friendOf: friend.friend,
+      Promise.all(traverse2).then(async(nm)=>{
+        let arr2 = [];
+        if(!await Keyv.get(msg.guild.id+"friends") ){
+        //  console.log("why god why")
+          await Keyv.set(msg.guild.id+"friends",[]);
+        }
+        let friends=await Keyv.get(msg.guild.id+"friends");
+        let traverse = await friends.map(async (friend) => {
+          let info = await getInformation(friend.handle);
+          arr.push({
+            username: "NULL",
+            rating: info.rating,
+            info: info,
+            friendOf: friend.friend,
+          });
+          return friend;
         });
-        return friend;
-      });
-      //console.log(traverse)
-      Promise.all(traverse).then((nm) => {
-        arr.sort((a, b) => b.rating - a.rating);
-        arr.forEach((me, idx) => {
-          let link = "https://codeforces.com/profile/" + me.info.handle;
-          //console.log(me.info)
-          if (me.username == "NULL") {
+        //console.log(traverse)
+        Promise.all(traverse).then((nm) => {
+          arr.sort((a, b) => b.rating - a.rating);
+          arr.forEach((me, idx) => {
+            let link = "https://codeforces.com/profile/" + me.info.handle;
+            //console.log(me.info)
+            if (me.username == "NULL") {
+              temp.push({
+                name: idx + 1 + `: ${me.info.handle}`,
+                value:
+                  "Curr Rating: " +
+                  me.rating +
+                  "    |   MaxRating: " +
+                  me.info.maxRating +
+                  `    |    Friend of <@${me.friendOf}>`,
+              });
+              return;
+            }
             temp.push({
-              name: idx + 1 + `${me.info.handle}`,
+              name: idx + 1 + `: ${me.username}`,
               value:
                 "Curr Rating: " +
                 me.rating +
                 "    |   MaxRating: " +
                 me.info.maxRating +
-                `    |    Friend of <@${me.friendOf}>`,
+                `    |    [${me.info.handle}](${link})`,
             });
-            return;
-          }
-          temp.push({
-            name: idx + 1 + `: ${me.username}`,
-            value:
-              "Curr Rating: " +
-              me.rating +
-              "    |   MaxRating: " +
-              me.info.maxRating +
-              `    |    [${me.info.handle}](${link})`,
           });
+          let msgg = {
+            color: 0x0099ff,
+            title: "Leaderboard :",
+            fields: temp,
+          };
+          msg.channel.send({ embed: msgg });
         });
-        let msgg = {
-          color: 0x0099ff,
-          title: "Leaderboard :",
-          fields: temp,
-        };
-        msg.channel.send({ embed: msgg });
-      });
-    } else if (words[1] == "P") {
-      let temp = [];
+      })
+      
+  }
+  else if(msg.content=="$boardP"){
+    let temp = [];
       let list = client.guilds.cache.get(serverId);
       let x = false;
       var arr = [];
@@ -934,8 +1013,8 @@ client.on("message", async (msg) => {
       //use .map on to traverse on , Map.map() return an array of promises of every item , use Promise.all() to implement further
       var traverse = await list.members.cache.map(async (member) => {
         // console.log(member.user.id,member.user.username)
-        if (users.get(member.user.id)) {
-          let info = users.get(member.user.id);
+        if (await Keyv.get(member.user.id+"userInfo")) {
+          let info = await Keyv.get(member.user.id+"userInfo");
           val = await getAC(info.handle);
           arr.push({
             username: member.user.tag,
@@ -950,6 +1029,11 @@ client.on("message", async (msg) => {
       });
       //console.log(traverse)
       Promise.all(traverse).then(async (nm) => {
+        if(!await Keyv.get(msg.guild.id+"friends") ){
+        //  console.log("why god why")
+          await Keyv.set(msg.guild.id+"friends",[]);
+        }
+        let friends=await Keyv.get(msg.guild.id+"friends");
         let traverse2 = await friends.map(async (friend) => {
           let info = await getInformation(friend.handle);
           val = await getAC(friend.handle);
@@ -998,7 +1082,6 @@ client.on("message", async (msg) => {
       });
       //console.log(arr)
       //console.log("outside")
-    }
   }
 });
 
@@ -1007,8 +1090,8 @@ client.on("message", async (msg) => {
   if (!msg.guild) return;
   if (msg.author.bot) return;
   if (!msg.content.startsWith("$")) return;
-  if (msg.content.startsWith("$virtual")) {
-    if (!ids.get(msg.author.id)) {
+  if (msg.content==("$virtual")) {
+    if (!await Keyv.get(msg.author.id+"ids")) {
       msg.channel.send(
         'Please set your cf handle using "$set,{your_id} before using this command again!.\n '
       );
@@ -1018,207 +1101,211 @@ client.on("message", async (msg) => {
     }
     let val = "";
     let list = client.guilds.cache.get(serverId);
-    list.members.cache.forEach((mem) => {
-      if (users.get(mem.user.id)) {
+    let t2=await list.members.cache.map(async(mem) => {
+      if (await Keyv.get(mem.user.id+"ids")) {
         val += `<@${mem.user.id}> |`;
       }
     });
-    let msgg = {
-      color: 0x0099ff,
-      title: "Virtual Contest (60mins), (4 questions)",
-      description:
-        "The contest would begin in 5 minutes, the problem list along with link would provided at the start of the contest.",
-      fields: [
-        {
-          name: "The bot would only consider submissions of registered users only:",
-          value: val,
-        },
-      ],
-    };
-    msg.channel.send({ embed: msgg });
-    msgg = {
-      color: 0x0099ff,
-      title: "Rules/Info",
-      fields: [
-        {
-          name: "1. The problems are calculated according to the average rating of the users participating.",
-          value: ":)",
-        },
-        {
-          name: "2. The problems provided would be in the increasing order of rating and thus, each one having more points weightage than its previous.",
-          value: " :)",
-        },
-        {
-          name: "3. Please do not submit solution of any other question in between the contest.",
-          value: ":) ",
-        },
-        {
-          name: "4. A reminder would be provided 10 minutes before the Ending time of Contest.",
-          value: ":) ",
-        },
-        {
-          name: "5. Late submission carries equal penalty for all problems.",
-          value: ":)",
-        },
-      ],
-    };
-    msg.channel.send({ embed: msgg });
-    questions.length = 0;
-
-    await setTimeout(async () => {
-      let sum = 0,
-        cnt = 0;
-      list.members.cache.forEach((mem) => {
-        if (users.get(mem.user.id)) {
-          let info = users.get(mem.user.id);
-          sum += info.rating;
-          cnt++;
-        }
-      });
-      let avgR = sum / cnt;
-      avgR /= 100;
-      avgR = Math.round(avgR);
-      avgR *= 100;
-      await getVirtualQues(avgR, msg).then((res) => {
-        let temp = [];
-        let len = res.loww.length;
-        let idx = Math.floor(Math.random() * len) - 1;
-        let p = res.loww[idx];
-
-        let link =
-          "https://codeforces.com/problemset/problem/" +
-          p.contestId +
-          "/" +
-          p.index;
-        temp.push({
-          name: p.name,
-          value: ` [Link](${link})   |  ` + "Points: " + 100,
-          inline: false,
-        });
-        questions.push({ ques: p.contestId + p.index, points: 100 });
-
-        len = res.low.length;
-        idx = Math.floor(Math.random() * len) - 1;
-        p = res.low[idx];
-
-        link =
-          "https://codeforces.com/problemset/problem/" +
-          p.contestId +
-          "/" +
-          p.index;
-        temp.push({
-          name: p.name,
-          value: ` [Link](${link})   |  ` + "Points: " + 200,
-          inline: false,
-        });
-        questions.push({ ques: p.contestId + p.index, points: 200 });
-
-        len = res.same.length;
-        idx = Math.floor(Math.random() * len) - 1;
-        p = res.same[idx];
-
-        link =
-          "https://codeforces.com/problemset/problem/" +
-          p.contestId +
-          "/" +
-          p.index;
-        temp.push({
-          name: p.name,
-          value: ` [Link](${link})   |  ` + "Points: " + 300,
-          inline: false,
-        });
-        questions.push({ ques: p.contestId + p.index, points: 300 });
-
-        len = res.high.length;
-        idx = Math.floor(Math.random() * len) - 1;
-        p = res.high[idx];
-
-        link =
-          "https://codeforces.com/problemset/problem/" +
-          p.contestId +
-          "/" +
-          p.index;
-        temp.push({
-          name: p.name,
-          value: ` [Link](${link})   |  ` + "Points: " + 400,
-          inline: false,
-        });
-        questions.push({ ques: p.contestId + p.index, points: 400 });
-        startTime = new Date().getTime();
-        let msgg = {
-          color: 0x0099ff,
-          title: "1 hour to Go, All the Best ",
-          fields: temp,
-        };
-        msg.channel.send({ embed: msgg });
-      });
-
+    Promise.all(t2).then(async(nm)=>{
+      let msgg = {
+        color: 0x0099ff,
+        title: "Virtual Contest (60mins), (4 questions)",
+        description:
+          "The contest would begin in 5 minutes, the problem list along with link would provided at the start of the contest.",
+        fields: [
+          {
+            name: "The bot would only consider submissions of registered users only:",
+            value: val,
+          },
+        ],
+      };
+      msg.channel.send({ embed: msgg });
+      msgg = {
+        color: 0x0099ff,
+        title: "Rules/Info",
+        fields: [
+          {
+            name: "1. The problems are calculated according to the average rating of the users participating.",
+            value: ":)",
+          },
+          {
+            name: "2. The problems provided would be in the increasing order of rating and thus, each one having more points weightage than its previous.",
+            value: " :)",
+          },
+          {
+            name: "3. Please do not submit solution of any other question in between the contest.",
+            value: ":) ",
+          },
+          {
+            name: "4. A reminder would be provided 10 minutes before the Ending time of Contest.",
+            value: ":) ",
+          },
+          {
+            name: "5. Late submission carries equal penalty for all problems.",
+            value: ":)",
+          },
+        ],
+      };
+      msg.channel.send({ embed: msgg });
+      questions.length = 0;
+  
       await setTimeout(async () => {
-        msg.channel.send("10 minutes to go!");
-
-        await setTimeout(async () => {
-          let arr = [];
-          let list = client.guilds.cache.get(serverId);
-          var trav = [];
-          //use .map on to traverse on , Map.map() return an array of promises of every item , use Promise.all() to implement further
-          trav = await list.members.cache.map(async (mem) => {
-            if (users.get(mem.user.id)) {
-              let info = users.get(mem.user.id);
-              let pts = await getPoints(info.handle, questions, startTime);
-              // console.log(trav)
-              let time =
-                "Minutes: " +
-                (Math.round(pts[1] / 60) % 60) +
-                ", Seconds: " +
-                (pts[1] % 60);
-              arr.push({
-                point: pts[0],
-                lastTime: time,
-                info: info,
-                username: mem.user.tag,
-                id: mem.user.id,
-              });
-            }
-            return mem;
-          });
-          //console.log(trav)
+        let sum = 0,
+          cnt = 0;
+        let traverse=await list.members.cache.map(async(mem) => {
+          if (await Keyv.get(mem.user.id+"userInfo")) {
+            let info = await Keyv.get(mem.user.id+"userInfo");
+            sum += info.rating;
+            cnt++;
+          }
+        });
+        Promise.all(traverse).then(async(nm)=>{
+          let avgR = sum / cnt;
+        avgR /= 100;
+        avgR = Math.round(avgR);
+        avgR *= 100;
+        await getVirtualQues(avgR, msg).then((res) => {
           let temp = [];
-          await Promise.all(trav)
-            .then((nm) => {
-              arr.sort((a, b) => b.pts - a.pts);
-              arr.forEach((me, idx) => {
-                let link = "https://codeforces.com/profile/" + me.info.handle;
-                temp.push({
-                  name: idx + 1 + `: ${me.username}`,
-                  value:
-                    "Points Scored: " +
-                    me.point +
-                    "    |   Time Taken(counted last correct submission): " +
-                    me.lastTime +
-                    `    |    [**${me.info.handle}**](${link})`,
+          let len = res.loww.length;
+          let idx = Math.floor(Math.random() * len) - 1;
+          let p = res.loww[idx];
+  
+          let link =
+            "https://codeforces.com/problemset/problem/" +
+            p.contestId +
+            "/" +
+            p.index;
+          temp.push({
+            name: p.name,
+            value: ` [Link](${link})   |  ` + "Points: " + 100,
+            inline: false,
+          });
+          questions.push({ ques: p.contestId + p.index, points: 100 });
+  
+          len = res.low.length;
+          idx = Math.floor(Math.random() * len) - 1;
+          p = res.low[idx];
+  
+          link =
+            "https://codeforces.com/problemset/problem/" +
+            p.contestId +
+            "/" +
+            p.index;
+          temp.push({
+            name: p.name,
+            value: ` [Link](${link})   |  ` + "Points: " + 200,
+            inline: false,
+          });
+          questions.push({ ques: p.contestId + p.index, points: 200 });
+  
+          len = res.same.length;
+          idx = Math.floor(Math.random() * len) - 1;
+          p = res.same[idx];
+  
+          link =
+            "https://codeforces.com/problemset/problem/" +
+            p.contestId +
+            "/" +
+            p.index;
+          temp.push({
+            name: p.name,
+            value: ` [Link](${link})   |  ` + "Points: " + 300,
+            inline: false,
+          });
+          questions.push({ ques: p.contestId + p.index, points: 300 });
+  
+          len = res.high.length;
+          idx = Math.floor(Math.random() * len) - 1;
+          p = res.high[idx];
+  
+          link =
+            "https://codeforces.com/problemset/problem/" +
+            p.contestId +
+            "/" +
+            p.index;
+          temp.push({
+            name: p.name,
+            value: ` [Link](${link})   |  ` + "Points: " + 400,
+            inline: false,
+          });
+          questions.push({ ques: p.contestId + p.index, points: 400 });
+          startTime = new Date().getTime();
+          let msgg = {
+            color: 0x0099ff,
+            title: "1 hour to Go, All the Best ",
+            fields: temp,
+          };
+          msg.channel.send({ embed: msgg });
+        });
+  
+        await setTimeout(async () => {
+          msg.channel.send("10 minutes to go!");
+  
+          await setTimeout(async () => {
+            let arr = [];
+            let list = client.guilds.cache.get(serverId);
+            var trav = [];
+            //use .map on to traverse on , Map.map() return an array of promises of every item , use Promise.all() to implement further
+            trav = await list.members.cache.map(async (mem) => {
+              if (await Keyv.get(mem.user.id+"userInfo")) {
+                let info = await Keyv.get(mem.user.id+"userInfo");
+                let pts = await getPoints(info.handle, questions, startTime);
+                // console.log(trav)
+                let time =
+                  "Minutes: " +
+                  (Math.round(pts[1] / 60) % 60) +
+                  ", Seconds: " +
+                  (pts[1] % 60);
+                arr.push({
+                  point: pts[0],
+                  lastTime: time,
+                  info: info,
+                  username: mem.user.tag,
+                  id: mem.user.id,
                 });
-              });
-              let msgg = {
-                color: 0x0099ff,
-                title: "Final Standings :",
-                fields: temp,
-              };
-              msg.channel.send({ embed: msgg });
-              questions.length = 0;
-            })
-            .catch((err) => {
-              console.log(err);
+              }
+              return mem;
             });
-        }, 1000 * 60 * 9);
-      }, 1000 * 60 * 50);
-    }, 1000 * 60 * 4);
+            //console.log(trav)
+            let temp = [];
+            await Promise.all(trav)
+              .then((nm) => {
+                arr.sort((a, b) => b.pts - a.pts);
+                arr.forEach((me, idx) => {
+                  let link = "https://codeforces.com/profile/" + me.info.handle;
+                  temp.push({
+                    name: idx + 1 + `: ${me.username}`,
+                    value:
+                      "Points Scored: " +
+                      me.point +
+                      "    |   Time Taken(counted last correct submission): " +
+                      me.lastTime +
+                      `    |    [**${me.info.handle}**](${link})`,
+                  });
+                });
+                let msgg = {
+                  color: 0x0099ff,
+                  title: "Final Standings :",
+                  fields: temp,
+                };
+                msg.channel.send({ embed: msgg });
+                questions.length = 0;
+              })
+              .catch((err) => {
+                console.log(err);
+              });
+          }, 1000 * 60 * 9);
+        }, 1000 * 60 * 50);
+        })
+      }, 1000 * 60 * 4);
+    })
   }
   if (msg.content.startsWith("$standings")) {
     if (questions.length === 0) {
       let msgg = {
         color: 0x0099ff,
         title:
-          "This command is only available during the virtual contest.\n Use $lboard,R/P for leaderboard",
+          "This command is only available during the virtual contest.\n Use $boardR/$boardP for leaderboard",
       };
       msg.channel.send({ embed: msgg });
       return;
@@ -1228,8 +1315,8 @@ client.on("message", async (msg) => {
     var trav = [];
     //use .map on to traverse on , Map.map() return an array of promises of every item , use Promise.all() to implement further
     trav = await list.members.cache.map(async (mem) => {
-      if (users.get(mem.user.id)) {
-        let info = users.get(mem.user.id);
+      if (await Keyv.get(mem.user.id+"userInfo")) {
+        let info = await Keyv.get(mem.user.id+"userInfo");
         let pts = await getPoints(info.handle, questions, startTime);
         // console.log(trav)
         let time =
@@ -1284,86 +1371,110 @@ client.on("message", async (msg) => {
   if (!msg.content.startsWith("$")) return;
   if (msg.content.startsWith("$help")) {
     let words = msg.content.split(",");
-    if (words[1] === "") {
-      let msgg = new Discord.MessageEmbed()
-        .setColor("#0099ff")
-        .setTitle("Help Desk | Command-Info")
-        .setDescription(
-          `The bot recognises only the following commands and all of them starts with "$".`
-        )
+    if (msg.content==("$help")) {
+      let page1 = new Discord.MessageEmbed()
         .addField(
-          `$set, - Used to link your cf_handle with your discord ID.`,
+          `1: $set, - Used to link your cf_handle with your discord ID.`,
           `Use "$help,set" for more info regarding this. `
         )
         .addField(
-          `$hi, - Used to start a casual conversation with the bot!`,
+          `2: $hi - Used to start a casual conversation with the bot!`,
           `Use "$help,hi" for more info regarding this. `
         )
         .addField(
-          `$bye, - Can only be used mid-conversation with the bot ($hi,) `,
+          `3: $bye - Can only be used mid-conversation with the bot ($hi) `,
           `If you dont get it by now, you wont. `
         )
         .addField(
-          `$rGraph, - Used to get Line graph of Rating Changes of any user on CF.`,
+          `4: $rGraph, - Used to get Line graph of Rating Changes of any user on CF.`,
           `Use "$help,rGraph" for more info regarding this. `
-        )
+        ).addField(
+          `5: $virtual - Used to start a virtual contest for all registered users on the server.`,
+          `Use "$help,virtual" for more info regarding this. `
+        );
+        let page2= new Discord.MessageEmbed()
         .addField(
-          `$rating, - Used to get Current Rating of any user on CF.`,
+          `6: $rating, - Used to get Current Rating of any user on CF.`,
           `Use "$help,rating" for more info regarding this. `
         )
         .addField(
-          `$upcoming, - Used to get a list of upcoming contest on CF`,
+          `7: $upcoming - Used to get a list of upcoming contest on CF`,
           `If you dont get it by now, you wont. `
         )
         .addField(
-          `$info, - Used to get public information of any user on CF.`,
+          `8: $info, - Used to get public information of any user on CF.`,
           `Use "$help,info" for more info regarding this. `
         )
         .addField(
-          `$search, - Used to get top google searches for any question's solution or any search in general.`,
+          `9: $search - Used to get top google searches for any question's solution or any search in general.`,
           `Use "$help,search" for more info regarding this. `
         )
         .addField(
-          `$status, - Used to get information regarding submissions of past 30 days of any user on CF`,
+          `10: $status, - Used to get information regarding submissions of past 30 days of any user on CF`,
           `Use "$help,status" for more info regarding this. `
+        );
+        let page3=new Discord.MessageEmbed()
+        .addField(
+          `11: $boardR- Used to get the leaderboard containing all registered users on the server. (based on CF rating)`,
+          `If you dont get it by now, you wont. `
         )
         .addField(
-          `$lboard, - Used to get the leaderboard containing all registered users on the server. (based on CF stats)`,
-          `Use "$help,lboard" for more info regarding this. `
+          `12: $boardP - Used to get the leaderboard containing all registered users on the server. (based on no of problems solved successfully in last 30 days.)`,
+          `If you dont get it by now, you wont. `
         )
         .addField(
-          `$virtual, - Used to start a virtual contest for all registered users on the server.`,
-          `Use "$help,virtual" for more info regarding this. `
-        )
-        .addField(
-          `$play, - Used to play songs on the server according to mood.`,
+          `13: $play, - Used to play songs on the server according to mood.`,
           `Use "$help,play" for more info regarding this. `
         )
         .addField(
-          `$skip, - Used to skip the currently playing song.`,
+          `14: $skip - Used to skip the currently playing song.`,
           `If you dont get it by now, you wont. `
         )
         .addField(
-          `$destroy, - Used to destroy the currently playing queue for songs(skip all).`,
-          `If you dont get it by now, you wont. `
-        )
-        .addField(
-          `$invite, - Used to get invite link of the bot.`,
+          `15: $destroy - Used to destroy the currently playing queue for songs(skip all).`,
           `If you dont get it by now, you wont. `
         );
-      msg.channel.send(msgg);
+        let page4= new Discord.MessageEmbed()
+        .addField(
+          `16: $invite, - Used to get invite link of the bot.`,
+          `If you dont get it by now, you wont. `
+        )
+        .addField(
+          `17: $friend, - Used to add any cf user to your friend list .`,
+          `The friend is added to the leaderboard. Format:$friend,username `
+        )
+        .addField(
+          `18: $remove, - Used to remove any cf user from your friend list .`,
+          `You can only remove your friend. Format:$remove,username `
+        )
+        ;
+      const embed= new EasyEmbedPages(msg.channel,{
+        pages:[
+            page1.toJSON(),
+            page2.toJSON(),
+            page3.toJSON(),
+            page4.toJSON()
+        ],
+        color:"RANDOM",
+        title:"Help Desk | Command-Info",
+        description:`The bot recognises only the following commands and all of them starts with "$".`,
+        allowStop: false, // enable if you want the stop button to appear used to stop the interactive process
+      time: 600000, // the idle time after which you want to stop the interactive process
+      ratelimit: 1600 
+      })
+      embed.start();
     } else if (words[1] == "set") {
       let msgg = new Discord.MessageEmbed()
         .setColor("#0099ff")
         .setTitle("Help :" + words[1])
-        .setDescription(`Normal Format: $set,{cf_username}-$set,mafailure`);
+        .setDescription(`Normal Format: $se, {cf_username}-$set,mafailure`);
       msg.channel.send(msgg);
     } else if (words[1] == "hi") {
       let msgg = new Discord.MessageEmbed()
         .setColor("#0099ff")
         .setTitle("Help :" + words[1])
         .setDescription(
-          `The chat bot replies and helps you according to your mood.`
+                    `The chat bot replies and helps you according to your mood. Possible Fields in $TYes are dp, binary search, graphs, greedy, math, trees, strings, brute force, two pointers. \n For example: $TYes,dp`
         );
       msg.channel.send(msgg);
     } else if (words[1] == "rGraph") {
@@ -1373,9 +1484,9 @@ client.on("message", async (msg) => {
         .setDescription(
           `Normal Format: $` +
             words[1] +
-            `,{cf_username}-$set,mafailure. \n "$` +
+            `,{cf_username}-$`+words[1]`,mafailure. \n "$` +
             words[1] +
-            `," can be used if user wants to get their info. `
+            `," can be used if user wants to get the rating Graph of some user on CF. `
         );
       msg.channel.send(msgg);
     } else if (words[1] == "rating") {
@@ -1385,9 +1496,9 @@ client.on("message", async (msg) => {
         .setDescription(
           `Normal Format: $` +
             words[1] +
-            `,{cf_username}-$set,mafailure. \n "$` +
+            `,{cf_username}-$`+words[1]`,mafailure. \n "$` +
             words[1] +
-            `," can be used if user wants to get their info. `
+            `," can be used if user wants to get the rating  of some user on CF. `
         );
       msg.channel.send(msgg);
     } else if (words[1] == "info") {
@@ -1397,7 +1508,7 @@ client.on("message", async (msg) => {
         .setDescription(
           `Normal Format: $` +
             words[1] +
-            `,{cf_username}-$set,mafailure. \n "$` +
+            `,{cf_username}-$`+words[1]`,mafailure. \n "$` +
             words[1] +
             `," can be used if user wants to get their info. `
         );
@@ -1409,9 +1520,9 @@ client.on("message", async (msg) => {
         .setDescription(
           `Normal Format: $` +
             words[1] +
-            `,{cf_username}-$set,mafailure. \n "$` +
+            `,{cf_username}-$`+words[1]`,mafailure. \n "$` +
             words[1] +
-            `," can be used if user wants to get their info. `
+            `," can be used if user wants to get the distribution of submissions of some user on CF. `
         );
       msg.channel.send(msgg);
     } else if (words[1] == "search") {
@@ -1419,21 +1530,10 @@ client.on("message", async (msg) => {
         .setColor("#0099ff")
         .setTitle("Help :" + words[1])
         .setDescription(
-          `Normal Format: $` + words[1] + `,{ques}-$set,what is codeforces?.`
+          `Normal Format: $` + words[1] + ` {ques}-$set what is codeforces?.`
         );
       msg.channel.send(msgg);
-    } else if (words[1] == "lboard") {
-      let msgg = new Discord.MessageEmbed()
-        .setColor("#0099ff")
-        .setTitle("Help :" + words[1])
-        .setDescription(
-          `Normal Format: $` +
-            words[1] +
-            `,{R/P}. \n 
-            Use $lboard,R to get leaderboard according to rating, $lboard,P to get leaderboard according to number of problems solved successfully in the past month.`
-        );
-      msg.channel.send(msgg);
-    } else if (words[1] == "play") {
+    }  else if (words[1] == "play") {
       let msgg = new Discord.MessageEmbed()
         .setColor("#0099ff")
         .setTitle("Help :" + words[1])
@@ -1441,7 +1541,7 @@ client.on("message", async (msg) => {
           `Normal Format: $` +
             words[1] +
             `,{mood}. Ex: $play,happy \n 
-            We have playlist for 4 possible moods - "happy","indie","rock","lofi".`
+            We have playlist for 5 possible moods - "happy","indie","rock","lofi","regular".`
         );
       msg.channel.send(msgg);
     } else if (words[1] == "virtual") {
@@ -1486,7 +1586,7 @@ client.on("message", async (msg) => {
   if (!msg.guild) return;
   if (msg.author.bot) return;
   if (!msg.content.startsWith("$")) return;
-  if (msg.content.startsWith("$invite")) {
+  if (msg.content==("$invite")) {
     let msgg = new Discord.MessageEmbed().setColor("#0099ff").setDescription(
       `Use this link to invite bot to any server.
           https://tiny.one/De-Codeforces`
@@ -1501,13 +1601,33 @@ client.on("message", async (msg) => {
   if (!msg.guild) return;
   if (msg.author.bot) return;
   if (!msg.content.startsWith("$")) return;
-  if (msg.content.startsWith("$friend")) {
+  if(msg.content=="$friend"){
+    return;
+  }
+  else if (msg.content.startsWith("$friend")) {
+    if(!await Keyv.get(msg.guild.id+"friends") ){
+    //  console.log("why god why")
+      await Keyv.set(msg.guild.id+"friends",[]);
+    }
     let words = msg.content.split(",");
     let userId = msg.author.id;
-    let list = client.guilds.cache.get(serverId);
+    let list = client.guilds.cache.get(msg.guild.id);
     let present = false,
       friendOf;
-    friends.forEach((f) => {
+      if(words.length!=2){
+       msg.channel.send("Please enter a valid username");
+        return;
+    }
+       words[1]=words[1].trim();
+      
+      if(words[1]=="" || words.length!=2){
+        msg.channel.send("Please enter a valid username");
+        return;
+      }
+      let friends=await Keyv.get(msg.guild.id+"friends")
+     // console.log(msg.guild.id)
+     // console.log(friends)
+    await friends.forEach((f) => {
       if (f.handle == words[1]) {
         present = true;
         friendOf = f.friend;
@@ -1517,12 +1637,14 @@ client.on("message", async (msg) => {
       let msgg = new Discord.MessageEmbed()
         .setColor("#0099ff")
         .setDescription(
-          `This user is already added as a friend of ${friendOf}. Get new friends , loser`
+          `This user is already added as a friend of <@${friendOf}>. Get new friends , loser`
         );
       msg.channel.send(msgg);
       return;
     } else {
-      friends.push({ friend: msg.author.id, handle: words[1] });
+      await getInformation(words[1]).then(async(res)=>{
+        friends.push({ friend: msg.author.id, handle: words[1] });
+        await Keyv.set(msg.guild.id+"friends",friends)
       let url = "https://codeforces.com/profile/" + words[1];
       let msgg = new Discord.MessageEmbed()
         .setColor("#0099ff")
@@ -1530,6 +1652,11 @@ client.on("message", async (msg) => {
           `[${words[1]}](${url}) added as a friend of <@${userId}>`
         );
       msg.channel.send(msgg);
+      })
+      .catch((err)=>{
+        msg.channel.send("Send valid username");
+      return;
+      })
     }
   }
 });
@@ -1540,11 +1667,24 @@ client.on("message", async (msg) => {
   if (!msg.guild) return;
   if (msg.author.bot) return;
   if (!msg.content.startsWith("$")) return;
-  if (msg.content.startsWith("$remove")) {
+  if(msg.content=="$remove"){
+    return;
+  }
+  else if (msg.content.startsWith("$remove")) {
     let words = msg.content.split(",");
+    if(words.length!=2){
+       msg.channel.send("Please enter a valid username");
+        return;
+    }
+     words[1]=words[1].trim();
+    if(words[1]=="" || words.length!=2){
+      msg.channel.send("Please enter a valid username");
+        return;
+    }
     let ff,
       present = false;
     let newarr = [];
+    let friends=await Keyv.get(msg.guild.id+"friends");
     friends.forEach((f) => {
       if (f.handle == words[1]) {
         ff = f;
@@ -1562,7 +1702,6 @@ client.on("message", async (msg) => {
       msg.channel.send(msgg);
       return;
     }
-    friends = newarr;
     if (ff.friend != msg.author.id) {
       let msgg = new Discord.MessageEmbed()
         .setColor("#0099ff")
@@ -1572,12 +1711,14 @@ client.on("message", async (msg) => {
       msg.channel.send(msgg);
       return;
     }
+    friends = newarr;
     let msgg = new Discord.MessageEmbed()
       .setColor("#0099ff")
       .setDescription(
         `${words[1]} successfully removed from your friend's list `
       );
     msg.channel.send(msgg);
+     Keyv.set(msg.guild.id+"friends",friends)
     return;
   }
 });
@@ -1594,10 +1735,10 @@ client.on("message", async (msg) => {
     await execute(msg, ServerQueue, queue);
     //msg.channel.send(msgg);
     return;
-  } else if (msg.content.startsWith(`$skip`)) {
+  } else if (msg.content==(`$skip`)) {
     await skip(msg, ServerQueue, queue);
     return;
-  } else if (msg.content.startsWith(`$destroy`)) {
+  } else if (msg.content==(`$destroy`)) {
     await destroy(msg, ServerQueue, queue);
     return;
   }

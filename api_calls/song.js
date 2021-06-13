@@ -46,6 +46,10 @@ const play=(guild,song,queue)=>{
 
 const execute=async(msg, ServerQueue,queue)=>{
     const words=msg.content.split(",");
+    if( words.length!=2){
+      msg.channel.send("Send valid command.");
+      return;
+    }
     //console.log(words)
     const currVC=msg.member.voice.channel;
     //member is a different guild object, where voice is also one(VOICESTATE), channel inside voice indicated voice cahnnel not text channel

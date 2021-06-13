@@ -21,7 +21,7 @@ const getRating=async(username)=>{
                 msg: 'An error occured',
                 error, //...some error we got back
              }
-             reject(errorObject);
+             reject("Error");
         }
         else{
             resolve(data);
@@ -72,7 +72,7 @@ const getUpcoming=async()=>{
                 msg: 'An error occured',
                 error, //...some error we got back
              }
-             reject(errorObject);
+             reject("An unknown error occured.");
         }
         else{
             resolve(contest);
@@ -294,10 +294,13 @@ const getPredProblemSet=async(rating,msg,tc)=>{
             })
             probs.rating=rating
         })
+        .catch(()=>{
+          console.log(err);
+        })
     
 
     return new Promise((resolve,reject)=>{
-        if(data.status!='OK'){
+        if(data.status!='OK' || !data.result){
             const errorObject = {
                 msg: 'An error occured',
                 error, //...some error we got back
