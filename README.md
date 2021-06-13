@@ -1,3 +1,5 @@
+![recycle bin](https://user-images.githubusercontent.com/15998276/121808709-6dc91000-cc77-11eb-8efb-8f68b1d423cb.png)
+
 # De-Codeforces
 ## Description
 De-Codeforces is a discord bot centered around competitive programming.
@@ -25,7 +27,8 @@ Paste the discort bot token in .env. Then start the bot using ``` npm run dev ``
 
 ## Libraries and API used
 * Codeforces API
-* Chart.js
+* quickchart.js
 * googl-it
-
+* Discord.js
+* ytdl-core
 
